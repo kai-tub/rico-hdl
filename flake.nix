@@ -18,10 +18,12 @@
         in {
           default = pkgs.mkShell {
             buildInputs = with pkgs; [
+              cargo-flamegraph
               pkg-config
               gdal
               clang
               glibc
+              cargo-zigbuild
               llvmPackages.bintools
               rustc
               cargo

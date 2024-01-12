@@ -36,17 +36,17 @@ use walkdir::WalkDir;
 
 // <A, D> are place-holders for types
 // (...) is a tuple struct with a single field
-struct Wrapper<A, D>(Array<A, D>);
-
-enum SupportedWrapper<D> {
-    U16(Wrapper<u16, D>),
-    F32(Wrapper<f32, D>),
-}
+// struct Wrapper<A, D>(Array<A, D>);
 
 // enum SupportedWrapper<D> {
-//     U16(Array<u16, D>),
-//     F32(Array<u16, D>),
+//     U16(Wrapper<u16, D>),
+//     F32(Wrapper<f32, D>),
 // }
+
+enum SupportedWrapper<D> {
+    U16(Array<u16, D>),
+    F32(Array<f32, D>),
+}
 
 // struct DataKeyPair<'a> {
 // path: &'a Path,
@@ -155,7 +155,7 @@ fn main() -> anyhow::Result<()> {
         panic!("Multiple keys present across datasets!");
     }
 
-    for grouped_files in v.iter() {
+    for grouped_files in v.iter().progress() {
         lmdb_writer(&cli.target, grouped_files);
     }
 
@@ -381,16 +381,16 @@ fn mk_safetensor(pairs: &Vec<DataKeyPair>) -> anyhow::Result<Vec<u8>> {
         let window_size = band1.size();
         // assert_eq!(band1.band_type(), GdalDataType::UInt16);
         match band1.band_type() {
-            GdalDataType::UInt16 => SupportedWrapper::U16(Wrapper(
+            GdalDataType::UInt16 => SupportedWrapper::U16(
                 band1
                     .read_as_array::<u16>(window, window_size, window_size, None)
                     .expect("File should open correctly. Report bug!"),
-            )),
-            GdalDataType::Float32 => SupportedWrapper::F32(Wrapper(
+            ),
+            GdalDataType::Float32 => SupportedWrapper::F32(
                 band1
                     .read_as_array::<f32>(window, window_size, window_size, None)
                     .expect("File should open correctly. Report bug!"),
-            )),
+            ),
             _ => panic!("Unsupported data type detected!"),
         }
         // let arr = band1
@@ -415,8 +415,26 @@ fn mk_safetensor(pairs: &Vec<DataKeyPair>) -> anyhow::Result<Vec<u8>> {
 impl<D: Dimension> SupportedWrapper<D> {
     fn buffer(&self) -> &[u8] {
         match self {
-            SupportedWrapper::U16(arr) => arr.buffer(),
-            SupportedWrapper::F32(arr) => arr.buffer(),
+            SupportedWrapper::U16(arr) => {
+                let slice = arr.as_slice().expect("Non-contiguous memory for tensor!");
+                let num_bytes = std::mem::size_of::<u16>();
+                let new_slice: &[u8] = unsafe {
+                    // len is the number of elements not the number of bytes!
+                    // but as we are using u8 it is effectively the same
+                    std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * num_bytes)
+                };
+                new_slice
+            }
+            SupportedWrapper::F32(arr) => {
+                let slice = arr.as_slice().expect("Non-contiguous memory for tensor!");
+                let num_bytes = std::mem::size_of::<f32>();
+                let new_slice: &[u8] = unsafe {
+                    // len is the number of elements not the number of bytes!
+                    // but as we are using u8 it is effectively the same
+                    std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * num_bytes)
+                };
+                new_slice
+            }
         }
     }
 }
@@ -427,82 +445,13 @@ impl<D: Dimension> View for SupportedWrapper<D> {
             SupportedWrapper::U16(_) => Dtype::U16,
             SupportedWrapper::F32(_) => Dtype::F32,
         }
-        // Dtype::U16
     }
 
     fn shape(&self) -> &[usize] {
         match self {
-            SupportedWrapper::U16(arr) => arr.0.shape(),
-            SupportedWrapper::F32(arr) => arr.0.shape(),
+            SupportedWrapper::U16(arr) => arr.shape(),
+            SupportedWrapper::F32(arr) => arr.shape(),
         }
-    }
-
-    fn data(&self) -> Cow<[u8]> {
-        self.buffer().into()
-    }
-
-    fn data_len(&self) -> usize {
-        self.buffer().len()
-    }
-}
-
-impl<D: Dimension> Wrapper<u16, D> {
-    fn buffer(&self) -> &[u8] {
-        let slice = self
-            .0
-            .as_slice()
-            .expect("Non-contiguous memory for tensor!");
-        let num_bytes = std::mem::size_of::<u16>();
-        let new_slice: &[u8] = unsafe {
-            // len is the number of elements not the number of bytes!
-            // but as we are using u8 it is effectively the same
-            std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * num_bytes)
-        };
-        new_slice
-    }
-}
-
-impl<D: Dimension> Wrapper<f32, D> {
-    fn buffer(&self) -> &[u8] {
-        let slice = self
-            .0
-            .as_slice()
-            .expect("Non-contiguous memory for tensor!");
-        let num_bytes = std::mem::size_of::<f32>();
-        let new_slice: &[u8] = unsafe {
-            // len is the number of elements not the number of bytes!
-            // but as we are using u8 it is effectively the same
-            std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * num_bytes)
-        };
-        new_slice
-    }
-}
-
-impl<D: Dimension> View for Wrapper<u16, D> {
-    fn dtype(&self) -> Dtype {
-        Dtype::U16
-    }
-
-    fn shape(&self) -> &[usize] {
-        self.0.shape()
-    }
-
-    fn data(&self) -> Cow<[u8]> {
-        self.buffer().into()
-    }
-
-    fn data_len(&self) -> usize {
-        self.buffer().len()
-    }
-}
-
-impl<D: Dimension> View for Wrapper<f32, D> {
-    fn dtype(&self) -> Dtype {
-        Dtype::F32
-    }
-
-    fn shape(&self) -> &[usize] {
-        self.0.shape()
     }
 
     fn data(&self) -> Cow<[u8]> {

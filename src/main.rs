@@ -198,7 +198,7 @@ fn check_grouped_files(grouped_files: &HashMap<String, Vec<DataKeyPair>>) {
     pretty_keys.sort_by(|a, b| natural_cmp(a, b));
 
     println!(
-        "The following keys will be used in the safetensor:\n{:?}",
+        "The following keys will be used in the safetensor:\n{:?}\n",
         pretty_keys
     );
 }
@@ -345,8 +345,9 @@ fn lmdb_writer(db_path: &Path, grouped_files: &HashMap<String, Vec<DataKeyPair>>
     // TODO: Try to get it running with an older GLIBC version!
     // -> Just bite the bullet and build it as nix image and docker image
     // Chunk size was chosen more or less randomly. The main idea is to
-    // not close & open a write transaction for every item.
-    for chunk in keys.chunks(4096).progress().into_iter() {
+    // not close & open a write transaction for every item and I also use
+    // it to open the files
+    for chunk in keys.chunks(512).progress().into_iter() {
         // wtxn cannot be shared across threads!
         // I assume, I would have to parallelize over chunks
         let mut wtxn = env.write_txn().expect("write transaction");

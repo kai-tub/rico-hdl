@@ -1,3 +1,8 @@
 /target
 .direnv
 .ipynb_checkpoints
+/result
+*.AppImage
+__pycache__/
+artifacts/
+benchmark/

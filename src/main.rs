@@ -162,6 +162,9 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Check that the HashMap that contains the `key`-String and the `DataKeyPair` data
+/// does not contain any duplicate data and that for each `key` we have the same matching files
+///
 fn check_grouped_files(grouped_files: &HashMap<String, Vec<DataKeyPair>>) {
     // create a set of safetensor_key values for each vector, while ensuring that these
     // length of the set is equal to the length of the vector -> Ensuring that there aren't any duplicated keys
@@ -223,11 +226,8 @@ fn recursively_find_tiffs(path: &str) -> Vec<PathBuf> {
 
 static BIGEARTHNET_S1_ORDERING: &[&str] = &["VH", "VV"];
 
+/// Fix S1 band ordering
 fn bigearthnet_s1_ordering(a: &str, b: &str) -> Ordering {
-    // prefer spatial-ordering for better cache-alignment
-    // as usually the channels with the same spatial resolution are stacked together
-    // and potentially interpolated
-    // let static_order = vec!["VH", "VV"];
     match (
         BIGEARTHNET_S1_ORDERING.iter().position(|&x| x == a),
         BIGEARTHNET_S1_ORDERING.iter().position(|&x| x == b),
@@ -241,10 +241,11 @@ static BIGEARTHNET_S2_ORDERING: &[&str] = &[
     "B02", "B03", "B04", "B08", "B05", "B06", "B07", "B8A", "B10", "B11", "B12", "B01", "B09",
 ];
 
+/// Fix S2 band ordering
+/// prefer spatial-ordering for better cache-alignment
+/// as usually the channels with the same spatial resolution are stacked together
+/// and potentially interpolated
 fn bigearthnet_s2_ordering(a: &str, b: &str) -> Ordering {
-    // prefer spatial-ordering for better cache-alignment
-    // as usually the channels with the same spatial resolution are stacked together
-    // and potentially interpolated
     match (
         BIGEARTHNET_S2_ORDERING.iter().position(|&x| x == a),
         BIGEARTHNET_S2_ORDERING.iter().position(|&x| x == b),

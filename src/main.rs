@@ -321,7 +321,12 @@ fn generate_grouped_files_from_bigearthnet_s1(
         vals.sort_by(|a, b| bigearthnet_s1_ordering(&a.safetensor_key, &b.safetensor_key));
     }
     // needs to be checked before the grouped_files are merged together!
-    check_grouped_files(&grouped_files);
+    if grouped_files.len() == 0 {
+        println!("No matching tiff files found! Skipping...");
+    } else {
+        // needs to be checked before the grouped_files are merged together!
+        check_grouped_files(&grouped_files);
+    }
     grouped_files
 }
 

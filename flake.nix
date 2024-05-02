@@ -4,44 +4,67 @@
     systems.url = "github:nix-systems/x86_64-linux";
     nix-filter.url = "github:numtide/nix-filter";
     devshell.url = "github:numtide/devshell";
+    nix-appimage = {
+      url = "github:ralismark/nix-appimage";
+      # inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs = {
     self,
     nixpkgs,
     systems,
     nix-filter,
+    nix-appimage,
     devshell,
   } @ inputs: let
     eachSystem = nixpkgs.lib.genAttrs (import systems);
     pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}.extend devshell.overlays.default));
     filter = nix-filter.lib;
+    pythonTestDeps = ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest];
   in {
     checks = eachSystem (system: let
       pkgs = pkgsFor.${system};
       lib = pkgs.lib;
-    in {
-      python_integration_test = let
-        inp =
-          self.packages.${system}.default;
-      in
-        # FUTURE: Add a wrapper to check if the AppImage works as expected!
-        pkgs.runCommandNoCC "python_integration_test" {
+      # put = package-under-test
+      mk_integration_test = name: put:
+        pkgs.runCommandNoCC name {
           nativeBuildInputs = [
-            inp
+            put
             (pkgs.python3.withPackages
-              (ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest]))
+              pythonTestDeps)
           ];
         } ''
           export ENCODER_S1_PATH=${./tiffs/BigEarthNet/S1}
-          export ENCODER_S2_PATH=${./tiffs/BigEarthNet/S1}
-          export ENCODER_EXEC_PATH=${lib.getExe inp}
+          export ENCODER_S2_PATH=${./tiffs/BigEarthNet/S2}
+          export ENCODER_EXEC_PATH=${lib.getExe put}
           echo "Running Python integration tests."
           pytest ${./test_python_integration.py} && touch $out
         '';
+    in {
+      python_integration_test =
+        mk_integration_test "python_integration_test" self.packages.${system}.default;
+      # FUTURE: Add a wrapper to check if the AppImage works as expected!
+      # Much harder than I thought. As fuse isn't available inside of the build environment,
+      # the appimage cannot be executed. Unpacking it should be possible but after spending way
+      # too much time trying to get it working, I am giving up, as it seems like the nested nix
+      # store inside of the squashfs root and the permissions seem to generate quite a few issues.
+      # a =
+      #   mk_integration_test "appimage_python_integration_test" self.packages.${system}.appImage;
     });
     packages = eachSystem (system: let
       pkgs = pkgsFor.${system};
-    in {
+    in rec {
+      appImage = let
+        image = inputs.nix-appimage.mkappimage.x86_64-linux {
+          drv = default;
+          name = default.name;
+          entrypoint = pkgs.lib.getExe default;
+        };
+      in
+        pkgs.runCommandNoCC "encoder-appimage" {meta.mainProgram = "encoder.AppImage";} ''
+          mkdir -p $out/bin
+          ln -s ${image} $out/bin/encoder.AppImage
+        '';
       default = pkgs.rustPlatform.buildRustPackage {
         pname = "encoder";
         version = "0.1.0";
@@ -115,16 +138,25 @@
           }
           {
             name = "ENCODER_S1_PATH";
-            value = "${./tiffs/BigEarthNet/S1}";
+            value = "./tiffs/BigEarthNet/S1";
           }
           {
+            # seems to be some permission issues with walkdir
+            # if I use ${./tiffs/...}
+            # The permission all look good under the nix store
+            # and copying from the directory to the local directory
+            # also works
             name = "ENCODER_S2_PATH";
-            value = "${./tiffs/BigEarthNet/S1}";
+            value = "./tiffs/BigEarthNet/S2";
           }
           {
             name = "ENCODER_EXEC_PATH";
-            value = "./results/bin/encoder";
-            # value = "${lib.getExe inp}";
+            # value = "./results/bin/encoder";
+            value = "${pkgs.lib.getExe inputs.self.packages.${system}.appImage}";
+          }
+          {
+            name = "RUST_BACKTRACE";
+            value = "1";
           }
         ];
         packages = [
@@ -132,7 +164,7 @@
             # ATTENTION! Care has to be taken to ensure that the
             # safetensors python version matches the version used in the cargo.lock file!
             pkgs.python3.withPackages
-            (ps: with ps; [jupyter ipython numpy lmdb rasterio safetensors more-itertools blosc2 pytest])
+            (ps: (pythonTestDeps ps) ++ (with ps; [jupyter ipython more-itertools blosc2]))
           )
         ];
       };

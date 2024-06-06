@@ -6,7 +6,6 @@
     devshell.url = "github:numtide/devshell";
     nix-appimage = {
       url = "github:ralismark/nix-appimage";
-      # inputs.nixpkgs.follows = "nixpkgs";
     };
   };
   outputs = {

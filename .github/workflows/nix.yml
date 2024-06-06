@@ -8,9 +8,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # write required for action-gh-release
       id-token: write
-      packages: write
+      packages: write # write required for docker
     steps:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
@@ -36,4 +36,4 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           nix run .#rs-tensor-encoder-docker-pusher
-        # if: startsWith(github.ref, 'refs/tags/') # Starting to test with every push to see what happens
+        if: startsWith(github.ref, 'refs/tags/')

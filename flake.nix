@@ -30,25 +30,14 @@
       system: let
         pkgs = pkgsFor.${system};
         lib = pkgs.lib;
-        # put = package-under-test
-        mk_integration_test = name: put:
-          pkgs.runCommandNoCC name {
-            nativeBuildInputs = [
-              put
-              (pkgs.python3.withPackages
-                pythonTestDeps)
-            ];
-          } ''
-            export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/S1}
-            export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/S2}
-            export ENCODER_EXEC_PATH=${lib.getExe put}
-            echo "Running Python integration tests."
-            pytest ${./integration_tests/test_python_integration.py} && touch $out
-          '';
       in
         {
-          python_integration_test =
-            mk_integration_test "python_integration_test" self.packages.${system}.rs-tensor-encoder;
+          rs-tensor-encoder-test-runner-check =
+            pkgs.runCommandNoCC "rs-encoder-test-runner-check" {
+              nativeBuildInputs = [self.packages.${system}.rs-tensor-encoder-test-runner];
+            } ''
+              ${lib.getExe self.packages.${system}.rs-tensor-encoder-test-runner} && touch $out
+            '';
         }
         // self.packages.${system}
     );
@@ -85,6 +74,22 @@
           nix build .#rs-tensor-encoder-docker
           DOCKER_REPOSITORY="docker://ghcr.io/kai-tub/rs-tensor-encoder"
           skopeo --insecure-policy copy "docker-archive:result" "$DOCKER_REPOSITORY"
+        '';
+      };
+
+      rs-tensor-encoder-test-runner = pkgs.writeShellApplication {
+        name = "rs-tensor-encoder-test-runner";
+        runtimeInputs = [
+          rs-tensor-encoder
+          (pkgs.python3.withPackages
+            pythonTestDeps)
+        ];
+        text = ''
+          export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/S1}
+          export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/S2}
+          export ENCODER_EXEC_PATH=${pkgs.lib.getExe rs-tensor-encoder}
+          echo "Running Python integration tests."
+          pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
       };
     });

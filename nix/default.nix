@@ -17,7 +17,10 @@ rustPlatform.buildRustPackage {
     root = ../.;
     include = ["src" "Cargo.lock" "Cargo.toml"];
   };
-  cargoSha256 = "sha256-YnXRoxjovPXWyqZsDcduhNDpfRbDz5HNMGSeczQWakg=";
+  # cargoLock.lockFile = ../Cargo.lock;
+  # https://github.com/NixOS/nixpkgs/pull/113176
+  cargoDepsName = "rs-tensor-encoder";
+  cargoHash = "sha256-suDh8hRGqc4RS/Q9LltghXyLoIBwhmOoNTkaZI/Qzic=";
   nativeBuildInputs = [
     pkg-config
     clang

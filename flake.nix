@@ -86,6 +86,7 @@
         text = ''
           export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/S1}
           export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/S2}
+          export ENCODER_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
           export ENCODER_EXEC_PATH=${pkgs.lib.getExe rs-tensor-encoder}
           echo "Running Python integration tests."
           pytest ${./integration_tests/test_python_integration.py} && echo "Success!"

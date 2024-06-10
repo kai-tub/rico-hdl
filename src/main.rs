@@ -43,13 +43,8 @@ use walkdir::WalkDir;
 //     F32(Wrapper<f32, D>),
 // }
 
-enum SupportedWrapper<D> {
-    U16(Array<u16, D>),
-    F32(Array<f32, D>),
-}
-
 // struct DataKeyPair<'a> {
-// path: &'a Path,
+// path: &'a Path
 
 // FUTURE: Fix this anti-pattern
 // it should be structure of arrays not
@@ -57,18 +52,44 @@ enum SupportedWrapper<D> {
 #[derive(Debug)]
 struct DataKeyPair {
     path: PathBuf,
-    safetensor_key: String,
+    safetensors_key: String,
     // could add explicit indexes to read from a given band
 }
 
-/// Encoder that converts TIFF files into `safetensor` values and embeds them in an LMDB database.
+#[derive(Debug)]
+enum TypedDataKeyPair {
+    BigEarthNetS1(DataKeyPair),
+    BigEarthNetS2(DataKeyPair),
+    HySpecNet(DataKeyPair),
+}
+
+const N_HYSPECNET_BANDS: isize = 224;
+
+impl TypedDataKeyPair {
+    fn get_safetensors_key(&self) -> &String {
+        match self {
+            Self::BigEarthNetS1(d) => &d.safetensors_key,
+            Self::BigEarthNetS2(d) => &d.safetensors_key,
+            Self::HySpecNet(d) => &d.safetensors_key,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum Satellite {
+    Sentinel1,
+    Sentinel2,
+    Enmap,
+}
+
+/// Encoder that converts TIFF files into `safetensors` values and embeds them in an LMDB database.
 #[derive(Parser)]
 #[command(
     author,
     version,
     about,
     long_about = "
-Encoder that converts TIFF files into `safetensor` values and embeds them in an LMDB database.
+Encoder that converts TIFF files into `safetensors` values and embeds them in an LMDB database.
 
 The CLI will have one required argument, which is the path to the target LMDB file (in reality it is a directory)
 Then it will take name arguments that indicate which dataset is being converted:
@@ -78,9 +99,9 @@ These will take the path to the root directory and find the TIFF files based on 
 
 Each dataset will have their own mapping function to:
 - filter out wrong tiff files (files not matching a specific regular expression)
-- generate a unique key for each safetensor 'value'
+- generate a unique key for each safetensors 'value'
    - Important: The key is ONLY guaranteed to be unique for each individual dataset!
-- Generate the safetensor value from the files, which will usually include each band as an individual key
+- Generate the safetensors value from the files, which will usually include each band as an individual key
 
 By providing multiple datset sources, all files will be written into a single LMDB file, potentially
 making it easier to work with the dataset.
@@ -106,36 +127,35 @@ struct Cli {
     /// Path to the BigEarthNet-S2 root directory.
     #[arg(long, value_name = "ROOT_DIR")]
     bigearthnet_s2_root: Option<PathBuf>,
-}
 
-// Tried to avoid GDAL and using the rust crate TIFF but this doesn't support multi-band tiffs...
-// fn main() {
-//     let img_file = File::open(PathBuf::from("./Highway_2.tif")).expect("cannot find image");
-//     let mut decoder = Decoder::new(img_file).expect("should create decoder");
-//     println!("Dimensions: {:?}", decoder.dimensions().unwrap());
-//     println!("Images: {:?}", decoder.more_images());
-//     let img = decoder.read_image().unwrap();
-//     match img {
-//         DecodingResult::U16(res) => {
-//             println!("Decoded");
-//         }
-//         _ => panic!("wrong bit depth"),
-//     };
-// }
+    /// Path to the HySpecNet root directory.
+    #[arg(long, value_name = "ROOT_DIR")]
+    hyspecnet_root: Option<PathBuf>,
+}
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let mut v = Vec::new();
     if let Some(bigearthnet_s1_root) = cli.bigearthnet_s1_root {
         println!("Starting to process BigEarthNet-S1");
-        v.push(generate_grouped_files_from_bigearthnet_s1(
+        v.push(generate_grouped_files(
             bigearthnet_s1_root.to_str().unwrap(),
+            Satellite::Sentinel1,
         ));
     }
     if let Some(bigearthnet_s2_root) = cli.bigearthnet_s2_root {
         println!("Starting to process BigEarthNet-S2");
-        v.push(generate_grouped_files_from_bigearthnet_s2(
+        v.push(generate_grouped_files(
             bigearthnet_s2_root.to_str().unwrap(),
+            Satellite::Sentinel2,
+        ));
+    }
+
+    if let Some(hyspecnet_root) = cli.hyspecnet_root {
+        println!("Starting to process HySpecNet-11k");
+        v.push(generate_grouped_files(
+            hyspecnet_root.to_str().unwrap(),
+            Satellite::Enmap,
         ));
     }
 
@@ -162,30 +182,29 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Check that the HashMap that contains the `key`-String and the `DataKeyPair` data
-/// does not contain any duplicate data and that for each `key` we have the same matching files
-///
-fn check_grouped_files(grouped_files: &HashMap<String, Vec<DataKeyPair>>) {
-    // create a set of safetensor_key values for each vector, while ensuring that these
+/// Check that the HashMap that contains the `group`-String and the `DataKeyPair` data
+/// does not contain any duplicate data and that for each `group` we have the same matching files
+fn check_grouped_files(grouped_files: &HashMap<String, Vec<TypedDataKeyPair>>) {
+    // create a set of safetensors_key values for each vector, while ensuring that these
     // length of the set is equal to the length of the vector -> Ensuring that there aren't any duplicated keys
-    let safetensor_keys_sets = grouped_files
+    let safetensors_keys_sets = grouped_files
         .values()
         .map(|vec| {
-            let safetensor_keys_set = vec.iter().fold(HashSet::new(), |mut acc, d| {
-                acc.insert(d.safetensor_key.clone());
+            let safetensors_keys_set = vec.iter().fold(HashSet::new(), |mut acc, d| {
+                acc.insert(d.get_safetensors_key().clone());
                 acc
             });
-            if safetensor_keys_set.len() != vec.len() {
+            if safetensors_keys_set.len() != vec.len() {
                 panic!(
                     "Safetensor keys are duplicated! This should never happen! Report as bug: {:?}",
                     vec
                 );
             }
-            safetensor_keys_set
+            safetensors_keys_set
         })
         .collect::<Vec<_>>();
     // check that all have the same number of values per match!
-    let safetensor_keys = safetensor_keys_sets.into_iter().reduce(|mut acc, h| {
+    let safetensors_keys = safetensors_keys_sets.into_iter().reduce(|mut acc, h| {
         let next_set_len = h.len();
         acc.extend(h);
         if acc.len() != next_set_len {
@@ -194,7 +213,7 @@ fn check_grouped_files(grouped_files: &HashMap<String, Vec<DataKeyPair>>) {
         acc
     }).expect("Should be non-empty iterable");
 
-    let mut pretty_keys = safetensor_keys
+    let mut pretty_keys = safetensors_keys
         .iter()
         .map(|x| x.clone())
         .collect::<Vec<String>>();
@@ -215,7 +234,13 @@ fn recursively_find_tiffs(path: &str) -> Vec<PathBuf> {
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| {
-            let extension = e.path().extension().unwrap_or_default().to_str().unwrap();
+            let extension = e
+                .path()
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap()
+                .to_lowercase();
             extension == "tiff" || extension == "tif"
         })
         .map(|e| e.path().to_path_buf())
@@ -255,31 +280,51 @@ fn bigearthnet_s2_ordering(a: &str, b: &str) -> Ordering {
     }
 }
 
-fn generate_grouped_files_from_bigearthnet_paths(
+/// Given a list of file `paths` loop over each file, extract the file stems and
+/// generate a grouped_files.
+/// The function applies a pre-defined regular expression (selected via `satellite` enum)
+/// where a `group` will be extracted as the key of the returning hashmap
+/// and the associated value will be pushed to a vector, where each value is a `DataKeyPair`
+/// with the `path` set to the considered `path` and the `safetensors_key` to the matched
+/// `saftensorsKey` from the regular expression.
+fn generate_grouped_files_from_paths(
     paths: Vec<PathBuf>,
-    pattern: &Regex,
-) -> HashMap<String, Vec<DataKeyPair>> {
-    // loop over all input directories
-    // and give option to merge them into single LMDB file
-    let mut grouped_files: HashMap<String, Vec<DataKeyPair>> = HashMap::new();
-    // grouped_files contains the LMDB key as key
-    // and the Vec<DataKeyPair> to generate the safetensor later
-    // this should be the return value for each dataset
-
+    satellite: Satellite,
+) -> HashMap<String, Vec<TypedDataKeyPair>> {
+    let mut grouped_files: HashMap<String, Vec<TypedDataKeyPair>> = HashMap::new();
+    // when parallelizing the regex matching, check:
+    // https://docs.rs/regex/latest/regex/#sharing-a-regex-across-threads-can-result-in-contention
+    let pattern_str = match satellite {
+        Satellite::Sentinel2 => r"(?<group>.*)_(?<safetensorsKey>B[0-9A]+)$",
+        Satellite::Sentinel1 => r"(?<group>.*)_(?<safetensorsKey>V[VH])$",
+        // ENMAP01-____L2A-DT0000004950_20221103T162438Z_001_V010110_20221118T145147Z-Y01460273_X03110438-SPECTRAL_IMAGE.TIF
+        Satellite::Enmap => r"(?<group>.*)-(?<safetensorsKey>SPECTRAL_IMAGE)$",
+    };
+    let pattern = Regex::new(&pattern_str).unwrap();
     // FUTURE: potentially think about parallel access as NFS storage could benefit from it
     for p in paths {
         // fix last unwrap
         let cap_res = pattern.captures(p.file_stem().unwrap().to_str().unwrap());
         match cap_res {
-            Some(cap) => grouped_files
-                .entry(cap["prefix"].to_string())
-                .or_default()
-                .push(DataKeyPair {
+            Some(cap) => {
+                let datakeypair = DataKeyPair {
                     path: p.clone(),
-                    safetensor_key: cap["key"].to_string(),
-                }),
+                    safetensors_key: cap["safetensorsKey"].to_string(),
+                };
+                grouped_files
+                    .entry(cap["group"].to_string())
+                    .or_default()
+                    .push(match satellite {
+                        Satellite::Sentinel1 => TypedDataKeyPair::BigEarthNetS1(datakeypair),
+                        Satellite::Sentinel2 => TypedDataKeyPair::BigEarthNetS2(datakeypair),
+                        Satellite::Enmap => TypedDataKeyPair::HySpecNet(datakeypair),
+                    })
+            }
             None => {
-                warn!("Found a tiff file that doesn't match the expected regular expression: \n{}\nThis might indicate issues with the dataset directory!", p.to_str().unwrap_or("<INVALID_UNICODE_PATH>"));
+                match satellite {
+                    Satellite::Enmap => {},
+                    _ => warn!("Found a tiff file that doesn't match the expected regular expression: \n{}\nThis might indicate issues with the dataset directory!", p.to_str().unwrap_or("<INVALID_UNICODE_PATH>")),
+                }
             }
         }
     }
@@ -287,17 +332,27 @@ fn generate_grouped_files_from_bigearthnet_paths(
     grouped_files
 }
 
-fn generate_grouped_files_from_bigearthnet_s2(
-    root_ben_s2_dir: &str,
-) -> HashMap<String, Vec<DataKeyPair>> {
-    let paths = recursively_find_tiffs(root_ben_s2_dir);
-    // when parallelizing the regex matching, check:
-    // https://docs.rs/regex/latest/regex/#sharing-a-regex-across-threads-can-result-in-contention
-    let ben_s2_stem_pattern = Regex::new(r"(?<prefix>.*)_(?<key>B[0-9A]+)$").unwrap();
-    let mut grouped_files =
-        generate_grouped_files_from_bigearthnet_paths(paths, &ben_s2_stem_pattern);
+fn generate_grouped_files(
+    root_dir: &str,
+    satellite: Satellite,
+) -> HashMap<String, Vec<TypedDataKeyPair>> {
+    let paths = recursively_find_tiffs(root_dir);
+    let mut grouped_files = generate_grouped_files_from_paths(paths, satellite);
     for vals in grouped_files.values_mut() {
-        vals.sort_by(|a, b| bigearthnet_s2_ordering(&a.safetensor_key, &b.safetensor_key));
+        vals.sort_by(|a, b| match (a, b) {
+            // Only support sorting on S2 only keys here
+            (TypedDataKeyPair::BigEarthNetS2(a), TypedDataKeyPair::BigEarthNetS2(b)) => {
+                bigearthnet_s2_ordering(&a.safetensors_key, &b.safetensors_key)
+            }
+            (TypedDataKeyPair::BigEarthNetS1(a), TypedDataKeyPair::BigEarthNetS1(b)) => {
+                bigearthnet_s1_ordering(&a.safetensors_key, &b.safetensors_key)
+            }
+            (TypedDataKeyPair::HySpecNet(a), TypedDataKeyPair::HySpecNet(b)) => {
+                // hyspecnet_ordering(&a.safetensors_key, &b.safetensors_key)
+                a.safetensors_key.cmp(&b.safetensors_key)
+            }
+            _ => panic!("Unsupported ordering operation!"),
+        })
     }
     if grouped_files.len() == 0 {
         println!("No matching tiff files found! Skipping...");
@@ -308,29 +363,7 @@ fn generate_grouped_files_from_bigearthnet_s2(
     grouped_files
 }
 
-fn generate_grouped_files_from_bigearthnet_s1(
-    root_ben_s1_dir: &str,
-) -> HashMap<String, Vec<DataKeyPair>> {
-    let paths = recursively_find_tiffs(root_ben_s1_dir);
-    // when parallelizing the regex matching, check:
-    // https://docs.rs/regex/latest/regex/#sharing-a-regex-across-threads-can-result-in-contention
-    let ben_s1_stem_pattern = Regex::new(r"(?<prefix>.*)_(?<key>V[VH])$").unwrap();
-    let mut grouped_files =
-        generate_grouped_files_from_bigearthnet_paths(paths, &ben_s1_stem_pattern);
-    for vals in grouped_files.values_mut() {
-        vals.sort_by(|a, b| bigearthnet_s1_ordering(&a.safetensor_key, &b.safetensor_key));
-    }
-    // needs to be checked before the grouped_files are merged together!
-    if grouped_files.len() == 0 {
-        println!("No matching tiff files found! Skipping...");
-    } else {
-        // needs to be checked before the grouped_files are merged together!
-        check_grouped_files(&grouped_files);
-    }
-    grouped_files
-}
-
-fn lmdb_writer(db_path: &Path, grouped_files: &HashMap<String, Vec<DataKeyPair>>) {
+fn lmdb_writer(db_path: &Path, grouped_files: &HashMap<String, Vec<TypedDataKeyPair>>) {
     fs::create_dir_all(db_path)
         .expect("should be able to create target directory. Maybe check permissions?");
     let env = EnvOpenOptions::new()
@@ -343,13 +376,11 @@ fn lmdb_writer(db_path: &Path, grouped_files: &HashMap<String, Vec<DataKeyPair>>
 
     // FUTURE: think about working with references instead of cloning
     let mut keys: Vec<String> = grouped_files.keys().map(|e| e.clone()).collect();
-    // could be changed in the future to sort not only by the prefix
+    // could be changed in the future to sort not only by the `group`
     // Remember, this only defines how the LMDB file is written, not how the
     // safetensors are written!
     keys.sort();
 
-    // TODO: Try to get it running with an older GLIBC version!
-    // -> Just bite the bullet and build it as nix image and docker image
     // Chunk size was chosen more or less randomly. The main idea is to
     // not close & open a write transaction for every item and I also use
     // it to open the files
@@ -360,9 +391,13 @@ fn lmdb_writer(db_path: &Path, grouped_files: &HashMap<String, Vec<DataKeyPair>>
         // maybe the chunk could be split into different threads and the tensors can be shared
         let keyed_tensors: Vec<(&String, Vec<u8>)> = chunk
             .into_par_iter()
-            .map(|key| (key, mk_safetensor(grouped_files.get(key).unwrap()).unwrap()))
+            .map(|key| {
+                (
+                    key,
+                    mk_safetensors(grouped_files.get(key).unwrap()).unwrap(),
+                )
+            })
             .collect();
-        // FUTURE: Write a test that ensures that the output remains stable!
         for (key, tns) in keyed_tensors {
             db.put(&mut wtxn, key, &tns).expect("should write");
         }
@@ -370,47 +405,87 @@ fn lmdb_writer(db_path: &Path, grouped_files: &HashMap<String, Vec<DataKeyPair>>
     }
 }
 
+enum SupportedWrapper<D> {
+    U16(Array<u16, D>),
+    I16(Array<i16, D>),
+    F32(Array<f32, D>),
+}
+
+fn mk_bigearthnet_safetensor(
+    datakeypair: &DataKeyPair,
+) -> (String, SupportedWrapper<ndarray::prelude::Dim<[usize; 2]>>) {
+    let dataset =
+        Dataset::open(datakeypair.path.clone()).expect("Current file should have read access!");
+    let band1 = dataset
+        .rasterband(1)
+        .expect("Tiff files should contain at least one band!");
+    // tuples (x, y) are in (cols, rows) order
+    // `window` is the (x, y) coordinate of the upper left corner of the region to read
+    let window = (0, 0);
+    // `window_size` is the amount to read -> We will always read everything!
+    let window_size = band1.size();
+    // assert_eq!(band1.band_type(), GdalDataType::UInt16);
+    let arr = match band1.band_type() {
+        GdalDataType::UInt16 => SupportedWrapper::U16(
+            band1
+                .read_as_array::<u16>(window, window_size, window_size, None)
+                .expect("File should open correctly. Report bug!"),
+        ),
+        GdalDataType::Float32 => SupportedWrapper::F32(
+            band1
+                .read_as_array::<f32>(window, window_size, window_size, None)
+                .expect("File should open correctly. Report bug!"),
+        ),
+        _ => panic!("Unsupported data type detected!"),
+    };
+    // TODO: Understand if `arr` is copied or not!
+    (datakeypair.safetensors_key.clone(), arr)
+}
+
+// Function cannot consume the datakeypair
+// name mapping could also be implemented by caller
+fn mk_hyspecnet_safetensor(
+    datakeypair: &DataKeyPair,
+    index: isize,
+) -> (String, SupportedWrapper<ndarray::prelude::Dim<[usize; 2]>>) {
+    let dataset =
+        Dataset::open(datakeypair.path.clone()).expect("Current file should have read access!");
+    let band1 = dataset
+        .rasterband(index)
+        .expect("Tiff files should contain at least one band!");
+    // tuples (x, y) are in (cols, rows) order
+    // `window` is the (x, y) coordinate of the upper left corner of the region to read
+    let window = (0, 0);
+    // `window_size` is the amount to read -> We will always read everything!
+    let window_size = band1.size();
+    // assert_eq!(band1.band_type(), GdalDataType::UInt16);
+    let arr = match band1.band_type() {
+        GdalDataType::Int16 => SupportedWrapper::I16(
+            band1
+                .read_as_array::<i16>(window, window_size, window_size, None)
+                .expect("File should open correctly. Report bug!"),
+        ),
+        _ => panic!("Unsupported data type detected!"),
+    };
+    // (datakeypair.safetensors_key.clone(), arr)
+    (index.to_string(), arr)
+}
+
 /// Given a `DataKeyPair` `d` vector, iterate through all elements
 /// and read the given raster data from `d.path` and interpret the
 /// data as safetensor data.
 /// Then construct the given safetensor data and return the resulting
 /// data vector.
-fn mk_safetensor(pairs: &Vec<DataKeyPair>) -> anyhow::Result<Vec<u8>> {
-    let it = pairs.into_iter().map(|e| {
-        let dataset = Dataset::open(e.path.clone()).expect("Current file should have read access!");
-        let band1 = dataset
-            .rasterband(1)
-            .expect("Tiff files should contain at least one band!");
-        // tuples (x, y) are in (cols, rows) order
-        // `window` is the (x, y) coordinate of the upper left corner of the region to read
-        let window = (0, 0);
-        // `window_size` is the amount to read -> We will always read everything!
-        let window_size = band1.size();
-        // assert_eq!(band1.band_type(), GdalDataType::UInt16);
-        match band1.band_type() {
-            GdalDataType::UInt16 => SupportedWrapper::U16(
-                band1
-                    .read_as_array::<u16>(window, window_size, window_size, None)
-                    .expect("File should open correctly. Report bug!"),
-            ),
-            GdalDataType::Float32 => SupportedWrapper::F32(
-                band1
-                    .read_as_array::<f32>(window, window_size, window_size, None)
-                    .expect("File should open correctly. Report bug!"),
-            ),
-            _ => panic!("Unsupported data type detected!"),
-        }
-        // let arr = band1
-        //     .read_as_array::<u16>(window, window_size, window_size, None)
-        //     .expect("File should open correctly. Report bug!");
-
-        // (e.safetensor_key.clone(), Wrapper(arr))
+fn mk_safetensors(pairs: &Vec<TypedDataKeyPair>) -> anyhow::Result<Vec<u8>> {
+    let it = pairs.into_iter().flat_map(|e| match e {
+        TypedDataKeyPair::BigEarthNetS1(e) => vec![mk_bigearthnet_safetensor(&e)],
+        TypedDataKeyPair::BigEarthNetS2(e) => vec![mk_bigearthnet_safetensor(&e)],
+        // GDAL is 1-indexed!
+        TypedDataKeyPair::HySpecNet(e) => (1..(N_HYSPECNET_BANDS + 1))
+            .map(|i| mk_hyspecnet_safetensor(&e, i))
+            .collect::<Vec<(String, SupportedWrapper<ndarray::prelude::Dim<[usize; 2]>>)>>(),
     });
-
-    Ok(serialize(
-        pairs.iter().map(|e| e.safetensor_key.clone()).zip(it),
-        &None,
-    )?)
+    Ok(serialize(it, &None)?)
 }
 
 // Code from GitHub issue:
@@ -425,6 +500,16 @@ impl<D: Dimension> SupportedWrapper<D> {
             SupportedWrapper::U16(arr) => {
                 let slice = arr.as_slice().expect("Non-contiguous memory for tensor!");
                 let num_bytes = std::mem::size_of::<u16>();
+                let new_slice: &[u8] = unsafe {
+                    // len is the number of elements not the number of bytes!
+                    // but as we are using u8 it is effectively the same
+                    std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * num_bytes)
+                };
+                new_slice
+            }
+            SupportedWrapper::I16(arr) => {
+                let slice = arr.as_slice().expect("Non-contiguous memory for tensor!");
+                let num_bytes = std::mem::size_of::<i16>();
                 let new_slice: &[u8] = unsafe {
                     // len is the number of elements not the number of bytes!
                     // but as we are using u8 it is effectively the same
@@ -451,6 +536,7 @@ impl<D: Dimension> View for SupportedWrapper<D> {
         match self {
             SupportedWrapper::U16(_) => Dtype::U16,
             SupportedWrapper::F32(_) => Dtype::F32,
+            SupportedWrapper::I16(_) => Dtype::I16,
         }
     }
 
@@ -458,6 +544,7 @@ impl<D: Dimension> View for SupportedWrapper<D> {
         match self {
             SupportedWrapper::U16(arr) => arr.shape(),
             SupportedWrapper::F32(arr) => arr.shape(),
+            SupportedWrapper::I16(arr) => arr.shape(),
         }
     }
 

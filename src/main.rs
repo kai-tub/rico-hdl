@@ -468,7 +468,7 @@ fn mk_hyspecnet_safetensor(
         _ => panic!("Unsupported data type detected!"),
     };
     // (datakeypair.safetensors_key.clone(), arr)
-    (index.to_string(), arr)
+    (format!("B{}", index), arr)
 }
 
 /// Given a `DataKeyPair` `d` vector, iterate through all elements

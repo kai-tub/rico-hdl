@@ -1,4 +1,4 @@
-name: Nix
+name: Build & Test
 
 on:
   - push

@@ -1,41 +1,39 @@
 # rs-tensor-encoder
 
-> a fast and easy to use application that converts popular remote sensing dataset into
-> a flexible deep-learning optimized data format for efficient and high-throughput DL model training.
+> a fast and easy-to-use application that converts popular remote sensing datasets into
+> a flexible deep-learning optimized data format for efficient, high-throughput DL model training.
 
-<center>
-  <img alt="Powered by nix" src="https://img.shields.io/badge/Powered%20By-Nix-blue?style=flat&logo=snowflake">
-  <img alt="Static Badge" src="https://img.shields.io/badge/AppImage-Available-blue?style=flat&logo=files">
-  <img alt="Static Badge Docker" src="https://img.shields.io/badge/Docker-Available-blue?style=flat&logo=docker&link=ghcr.io%2Fkai-tub%2Frs-tensor-encoder">
-  <img alt="Tests Status Badge" src="https://github.com/kai-tub/rs-tensor-encoder/actions/workflows/nix.yml/badge.svg">
-  <img alt="Static Badge MIT License" src="https://img.shields.io/badge/License-MIT-blue?style=flat&link=https%3A%2F%2Fopensource.org%2Flicenses%2Fmit-0">
-</center>
+<img alt="Powered by nix" src="https://img.shields.io/badge/Powered%20By-Nix-blue?style=flat&logo=snowflake"> <img alt="Static Badge" src="https://img.shields.io/badge/AppImage-Available-blue?style=flat&logo=files">
+<img alt="Static Badge Docker" src="https://img.shields.io/badge/Docker-Available-blue?style=flat&logo=docker&link=ghcr.io%2Fkai-tub%2Frs-tensor-encoder">
+<img alt="Static Badge MIT License" src="https://img.shields.io/badge/License-MIT-blue?style=flat&link=https%3A%2F%2Fopensource.org%2Flicenses%2Fmit-0">
+<img alt="Tests Status Badge" src="https://github.com/kai-tub/rs-tensor-encoder/actions/workflows/nix.yml/badge.svg">
 
 ## Overview
 
 The core idea is to run the encoder _once_ on a supported remote sensing dataset.
 The encoder will convert the remote sensing images into a DL-optimized format.
-The resulting file will provide significantly higher throughput compared to the original
+The resulting file will provide significantly higher throughput than the original
 remote sensing images (patches)
 and should be used instead of the unprocessed dataset.
-The data itself is encoded in a DL-library independent format, ensuring flexible use.
-Concretely, the image files are converted into the [safetensors][s] format and stored inside of the
+The data is encoded in a DL-library independent format, ensuring flexible use.
+Concretely, the image files are converted into the [safetensors][s] format and stored inside the
 [LMDB][LMDB] key-value database.
 
 > [!IMPORTANT]
 > The encoded image data values are _identical_ to the data values from the original dataset!
 
-To access the data with Python, ensure to install the [LMDB][LMDB] and [safetensors][s] packages.
+To access the data with Python, install the [LMDB][LMDB] and [safetensors][s] packages.
 
 ### Download
 
-Special care has been taken to ensure that the application can be easily run on various different environments
-without requiring any additional dependencies to be installed on the server.
-To achieve this, the application is packaged in two different ways:
-- [AppImage](https://appimage.org/)
-- [OCI Container (often called Docker image)](https://opencontainers.org/)
+Great care has been taken to ensure that the application can effortlessly run on different environments
+without requiring additional dependencies on the server.
+To make this possible, the application is packaged in two different ways as an:
 
-To run the application on any x86-64 Linux server we recommend to use the `AppImage`:
+- [AppImage](https://appimage.org/) and an
+- [OCI Container (often called Docker image)](https://opencontainers.org/).
+
+To run the application on any x86-64 Linux server, we recommend to use the `AppImage`:
 - [rs-tensor-encoder.AppImage](https://github.com/kai-tub/rs-tensor-encoder/releases/latest/download/rs-tensor-encoder.AppImage)
 
 The docker image can be used to run it on other operating systems:
@@ -53,11 +51,9 @@ Additional datasets will be added in the near future!
 
 ## [BigEarthNet][ben] Example
 
-> [!IMPORTANT]
-> Make sure to have [downloaded the rs-tensor-encoder](#Download) binary and installed
-> the [lmdb][pyl] and [saftensors][pys] Python packages!
-
-To convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.0][ben]
+First, [downloaded the rs-tensor-encoder](#Download) binary and install
+the [lmdb][pyl] and [saftensors][pys] Python packages.
+Then, to convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.0][ben]
 dataset into the optimized format, call the application with:
 
 ```bash
@@ -65,8 +61,8 @@ rs-tensor-encoder --bigearthnet-s1-root <S1_ROOT_DIR> --bigearthnet-s2-root <S2_
 ```
 
 In BigEarthNet, each band is stored as a separate file with the associate band as a suffix (`_B01`, `_B12`, `_VV`, ...).
-The encoder will group all image files with the same name/prefix together and store the data in a [safetensors][s]
-dictionary, where the band name is the key (`B01`, `B12`, `VV`, ...).
+The encoder groups all image files with the same name/prefix and stores the data as a [safetensors][s] dictionary,
+where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
 
 <details>
   <summary>Example Input</summary>
@@ -126,7 +122,7 @@ The following code shows how to access the converted database:
 
 ```python
 import lmdb
-# import desired deep learning library:
+# import desired deep-learning library:
 # numpy, torch, tensorflow, paddle, flax, mlx
 from safetensors.numpy import load
 from pathlib import Path
@@ -147,27 +143,26 @@ rgb_tensor = np.stack([safetensor_dict[b] for b in rgb_bands])
 assert rgb_tensor.shape == (3, 120, 120) 
 ```
 
-> ![TIP]
-> Remember to use the appropriate `load` function for a given deep learning library.
 
-The [ConfigILM](https://github.com/lhackel-tub/ConfigILM) library provides [an excellant
+> [!TIP]
+> Remember to use the appropriate `load` function for a given deep-learning library.
+
+The [ConfigILM](https://github.com/lhackel-tub/ConfigILM) library provides [an excellent
 LMDB reader example](https://github.com/lhackel-tub/ConfigILM/blob/main/configilm/extra/BENv2_utils.py)
-showing how to utilize the encoded data for high-throughput deep learning.
+that shows how to utilize the encoded data for high-throughput deep-learning.
 
 ### [HySpecNet-11k][hyspecnet] Example
 
-> [!IMPORTANT]
-> Make sure to have [downloaded the rs-tensor-encoder](#Download) binary and installed
-> the [lmdb][pyl] and [saftensors][pys] Python packages!
-
-To convert the patches from the [HySpecNet-11k][hyspecnet]
+First, [downloaded the rs-tensor-encoder](#Download) binary and install
+the [lmdb][pyl] and [saftensors][pys] Python packages.
+Then, to convert the patches from the [HySpecNet-11k][hyspecnet]
 dataset into the optimized format, call the application with:
 
 ```bash
 rs-tensor-encoder --hyspecnet <HYSPECNET_ROOT_DIR> encoded-hyspecnet
 ```
 
-In HySpecNet, each patch contains 224 bands.
+In [HySpecNet-11k][hyspecnet], each patch contains 224 bands.
 The encoder will convert each patch into a [safetensors][s]
 dictionary, where the band index prefixed with `B` is the key (for example, `B1`, `B201`).
 
@@ -248,7 +243,7 @@ integration_tests/tiffs/HySpecNet-11k
 ```python
 import lmdb
 import numpy as np
-# import desired deep learning library:
+# import desired deep-learning library:
 # numpy, torch, tensorflow, paddle, flax, mlx
 from safetensors.numpy import load
 from pathlib import Path
@@ -278,10 +273,11 @@ assert tensor.shape == (202, 128, 128)
     Why safetensors?
   </summary>
 
-The major benefit of [safetensors][s] is that it is [_fast_](https://huggingface.co/docs/safetensors/speed)
-and a deep-learning independent tensor serialization format.
-This allows teams with different preferences for deep-learning formats to use the same data without any additional work.
-To see additional benefits of the safetensors format, check [the official documentation](https://huggingface.co/docs/safetensors/index).
+The main advantage of the [safetensors][s] format is its [_fast_](https://huggingface.co/docs/safetensors/speed)
+and deep-learning independent tensor serialization capability.
+This allows teams with different deep-learning framework preferences to utilize the same data without issues.
+Please refer to [the official documentation](https://huggingface.co/docs/safetensors/index) to discover more benefits
+of the [safetensors][s] format.
 
 </details>
 
@@ -290,23 +286,23 @@ To see additional benefits of the safetensors format, check [the official docume
   Why LMDB?
 </summary>
 
-LMDB is a high-performance in-memory key-value store that has stood the test of time.
-It fully exploits the operating system's buffer cache and allows easy parallel read access.
-Making it ideal for environments where multiple users are accessing the same data, which is common in deep-learning environments
-with shared resources.
+[LMDB][LMDB] is an in-memory key-value store known for its reliability and high performance.
+It effectively utilizes the operating system's buffer cache and allows seamless parallel read access.
+These properties make it an excellent choice for environments where multiple users require access to the same data,
+which is common in deep-learning research.
 
-The major reason to prefer [LMDB][LMDB] over more array-structured solutions,
-such as [netcdf](https://www.unidata.ucar.edu/software/netcdf/) or [Zarr](https://zarr.dev/), is that it better aligns
-with the deep-learning specific access patterns and dataset characteristics.
-The images of remote sensing deep-learning datasets are fairly small (usually around 100px x 100px), may have different
-resolutions depending on the selected band (BigEarthNet highest resolution is 120px x 120px and the lowest is 20px x 20px) and
-are randomely accessed during training.
-The random access pattern is an important differenciator between classical machine-learning applications or applications that calculate
-zonal statistics and deep-learning.
-These proporties lead to sub-par utilization of array-structured data formats for deep-learning applications.
+One significant advantage of choosing [LMDB][LMDB] over more array-structured solutions like 
+[netcdf](https://www.unidata.ucar.edu/software/netcdf/) or [Zarr](https://zarr.dev/)
+is that it is better aligned with the access patterns and dataset characteristics specific
+to remote sensing deep-learning datasets.
+Remote sensing deep-learning datasets typically consist of small images
+(usually around 120px x 120px) with varying resolutions based on the selected band
+(e.g., BigEarthNet's highest resolution is 120px x 120px and the lowest is 20px x 20px).
+These images are randomly accessed during training, which differs from the access patterns
+in classical machine-learning applications or applications that calculate zonal statistics.
+These characteristics make array-structured data formats less suitable for deep-learning applications.
 
 </details>
-
 
 
 [ben]: https://bigearth.net

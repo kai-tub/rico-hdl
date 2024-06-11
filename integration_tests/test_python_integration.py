@@ -79,7 +79,7 @@ def read_all_raster_bands(path):
     as a string and the value the array data
     """
     with rasterio.open(path) as r:
-        return {str(i): r.read(i) for i in range(1, r.count + 1)}
+        return {f"B{i}": r.read(i) for i in range(1, r.count + 1)}
 
 def test_python_hyspecnet_integration(hyspecnet_root, encoded_hyspecnet_path):
     source_file_data = {file: read_all_raster_bands(file) for file in hyspecnet_root.glob("**/*SPECTRAL_IMAGE.TIF")}

@@ -6,3 +6,4 @@
 __pycache__/
 artifacts/
 benchmark/
+.pre-commit-config.yaml

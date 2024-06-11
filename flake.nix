@@ -4,6 +4,7 @@
     systems.url = "github:nix-systems/x86_64-linux";
     nix-filter.url = "github:numtide/nix-filter";
     devshell.url = "github:numtide/devshell";
+    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
     nix-appimage = {
       url = "github:ralismark/nix-appimage";
     };
@@ -12,9 +13,8 @@
     self,
     nixpkgs,
     systems,
-    nix-filter,
-    nix-appimage,
     devshell,
+    ...
   } @ inputs: let
     eachSystem = nixpkgs.lib.genAttrs (import systems);
     pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
@@ -31,6 +31,12 @@
         lib = pkgs.lib;
       in
         {
+          pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              alejandra.enable = true;
+            };
+          };
           rs-tensor-encoder-test-runner-check =
             pkgs.runCommandNoCC "rs-encoder-test-runner-check" {
               nativeBuildInputs = [self.packages.${system}.rs-tensor-encoder-test-runner];
@@ -99,9 +105,11 @@
       buildPackage = inputs.self.packages.${system}.default;
     in {
       default = pkgs.mkShell {
+        inherit (self.checks.${system}.pre-commit-check) shellHook;
         nativeBuildInputs = buildPackage.nativeBuildInputs;
         buildInputs =
           buildPackage.buildInputs
+          ++ self.checks.${system}.pre-commit-check.enabledPackages
           ++ (with pkgs; [
             # glibc
             rustc

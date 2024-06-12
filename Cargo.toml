@@ -1,5 +1,5 @@
 [package]
-name = "rs-tensor-encoder"
+name = "rico-hdl"
 version = "0.1.0"
 edition = "2021"
 exclude = ["README.md", "nix", "integration_tests"]

@@ -10,7 +10,7 @@
   version ? "git",
 }:
 rustPlatform.buildRustPackage {
-  pname = "rs-tensor-encoder";
+  pname = "rico-hdl";
   inherit version;
 
   src = nix-filter {
@@ -19,8 +19,8 @@ rustPlatform.buildRustPackage {
   };
   # cargoLock.lockFile = ../Cargo.lock;
   # https://github.com/NixOS/nixpkgs/pull/113176
-  cargoDepsName = "rs-tensor-encoder";
-  cargoHash = "sha256-suDh8hRGqc4RS/Q9LltghXyLoIBwhmOoNTkaZI/Qzic=";
+  cargoDepsName = "rico-hdl";
+  cargoHash = "sha256-1Ufs/MLlL8oAm4xDzte0lv8+HzfV2z1dYjSrP7Iaao4=";
   nativeBuildInputs = [
     pkg-config
     clang
@@ -39,9 +39,9 @@ rustPlatform.buildRustPackage {
     [llvmPackages_latest.libclang.lib];
   meta = {
     description = "A deep-learning tensor encoder tool for remote sensing datasets.";
-    homepage = "https://github.com/kai-tub/rs-tensor-encoder";
+    homepage = "https://github.com/kai-tub/rico-hdl";
     license = lib.licenses.mit;
     maintainers = with lib.maintainers; [kai-tub];
-    mainProgram = "rs-tensor-encoder";
+    mainProgram = "rico-hdl";
   };
 }

@@ -12,7 +12,7 @@ in {
   default = final: prev: let
     date = mkDate (inputs.self.lastModifiedDate or "19700101");
   in {
-    rs-tensor-encoder = final.callPackage ./default.nix {
+    rico-hdl = final.callPackage ./default.nix {
       version = "${cargo_toml.package.version}+date=${date}_${inputs.self.shortRev or "dirty"}";
       nix-filter = inputs.nix-filter.lib;
     };

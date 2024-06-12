@@ -35,13 +35,14 @@
             src = ./.;
             hooks = {
               alejandra.enable = true;
+              trim-trailing-whitespace.enable = true;
             };
           };
-          rs-tensor-encoder-test-runner-check =
+          rico-hdl-test-runner-check =
             pkgs.runCommandNoCC "rs-encoder-test-runner-check" {
-              nativeBuildInputs = [self.packages.${system}.rs-tensor-encoder-test-runner];
+              nativeBuildInputs = [self.packages.${system}.rico-hdl-test-runner];
             } ''
-              ${lib.getExe self.packages.${system}.rs-tensor-encoder-test-runner} && touch $out
+              ${lib.getExe self.packages.${system}.rico-hdl-test-runner} && touch $out
             '';
         }
         // self.packages.${system}
@@ -49,43 +50,43 @@
     packages = eachSystem (system: let
       pkgs = pkgsFor.${system};
     in rec {
-      default = rs-tensor-encoder;
+      default = rico-hdl;
 
-      rs-tensor-encoder = pkgs.rs-tensor-encoder;
+      rico-hdl = pkgs.rico-hdl;
 
-      rs-tensor-encoder-AppImage = inputs.nix-appimage.mkappimage.${system} {
-        drv = rs-tensor-encoder;
-        name = rs-tensor-encoder.name;
-        entrypoint = pkgs.lib.getExe rs-tensor-encoder;
+      rico-hdl-AppImage = inputs.nix-appimage.mkappimage.${system} {
+        drv = rico-hdl;
+        name = rico-hdl.name;
+        entrypoint = pkgs.lib.getExe rico-hdl;
       };
 
-      rs-tensor-encoder-docker = pkgs.dockerTools.buildLayeredImage {
-        name = rs-tensor-encoder.pname;
+      rico-hdl-docker = pkgs.dockerTools.buildLayeredImage {
+        name = rico-hdl.pname;
         tag = "latest";
-        contents = [rs-tensor-encoder];
+        contents = [rico-hdl];
         config = {
           Entrypoint = [
-            "${pkgs.lib.getExe rs-tensor-encoder}"
+            "${pkgs.lib.getExe rico-hdl}"
           ];
         };
       };
 
-      rs-tensor-encoder-docker-pusher = pkgs.writeShellApplication {
-        name = "rs-tensor-encoder-docker-pusher";
+      rico-hdl-docker-pusher = pkgs.writeShellApplication {
+        name = "rico-hdl-docker-pusher";
         runtimeInputs = [pkgs.skopeo];
         text = ''
           # requires user to be logged in to the GitHub container registry
           # via `docker login ghcr.io`
-          nix build .#rs-tensor-encoder-docker
-          DOCKER_REPOSITORY="docker://ghcr.io/kai-tub/rs-tensor-encoder"
+          nix build .#rico-hdl-docker
+          DOCKER_REPOSITORY="docker://ghcr.io/kai-tub/rico-hdl"
           skopeo --insecure-policy copy "docker-archive:result" "$DOCKER_REPOSITORY"
         '';
       };
 
-      rs-tensor-encoder-test-runner = pkgs.writeShellApplication {
-        name = "rs-tensor-encoder-test-runner";
+      rico-hdl-test-runner = pkgs.writeShellApplication {
+        name = "rico-hdl-test-runner";
         runtimeInputs = [
-          rs-tensor-encoder
+          rico-hdl
           (pkgs.python3.withPackages
             pythonTestDeps)
         ];
@@ -93,7 +94,7 @@
           export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/S1}
           export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/S2}
           export ENCODER_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
-          export ENCODER_EXEC_PATH=${pkgs.lib.getExe rs-tensor-encoder}
+          export ENCODER_EXEC_PATH=${pkgs.lib.getExe rico-hdl}
           echo "Running Python integration tests."
           pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
@@ -152,7 +153,7 @@
           {
             name = "ENCODER_EXEC_PATH";
             # value = "./results/bin/encoder";
-            value = "${inputs.self.packages.${system}.rs-tensor-encoder-AppImage}";
+            value = "${inputs.self.packages.${system}.rico-hdl-AppImage}";
           }
           {
             name = "RUST_BACKTRACE";

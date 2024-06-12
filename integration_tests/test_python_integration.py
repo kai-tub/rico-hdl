@@ -59,14 +59,14 @@ def test_python_bigearthnet_integration(s1_root, s2_root, encoded_bigearthnet_s1
     s2_data = {file: read_single_band_raster(file) for file in s2_root.glob("**/*.tif*")}
     source_data = {**s1_data, **s2_data}
     env = lmdb.open(str(encoded_bigearthnet_s1_s2_path), readonly=True)
-    
+
     with env.begin(write=False) as txn:
         cur = txn.cursor()
         decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
-    
+
     # The encoded data is nested inside of another safetensor dictionary, where the inner keys are derived from the band suffix
     decoded_values = [v for outer_v in decoded_lmdb_data.values() for v in outer_v.values()]
-    
+
     # Simply check if the data remains identical, as this is the only _true_ thing I care about from the Python viewpoint
     # If the keys/order or anything else is wrong, it isn't part of the integration test but should be handled separately as a unit test!
     for (source_key, source_value) in source_data.items():
@@ -84,7 +84,7 @@ def read_all_raster_bands(path):
 def test_python_hyspecnet_integration(hyspecnet_root, encoded_hyspecnet_path):
     source_file_data = {file: read_all_raster_bands(file) for file in hyspecnet_root.glob("**/*SPECTRAL_IMAGE.TIF")}
     assert len(source_file_data) > 0
-    
+
     # code to create the directory
     # ./result/bin/encoder --hyspecnet-11k <PATH> hyspec_artifacts/
     env = lmdb.open(str(encoded_hyspecnet_path), readonly=True)

@@ -1,12 +1,11 @@
-# rs-tensor-encoder
+# rico-hdl
 
-> a fast and easy-to-use application that converts popular remote sensing datasets into
-> a flexible deep-learning optimized data format for efficient, high-throughput DL model training.
+> A fast and easy-to-use **r**emote sensing **i**mage format **co**nverter for **h**igh-throughput **d**eep-**l**earning (rico-hdl).
 
 <img alt="Powered by nix" src="https://img.shields.io/badge/Powered%20By-Nix-blue?style=flat&logo=snowflake"> <img alt="Static Badge" src="https://img.shields.io/badge/AppImage-Available-blue?style=flat&logo=files">
-<img alt="Static Badge Docker" src="https://img.shields.io/badge/Docker-Available-blue?style=flat&logo=docker&link=ghcr.io%2Fkai-tub%2Frs-tensor-encoder">
+<img alt="Static Badge Docker" src="https://img.shields.io/badge/Docker-Available-blue?style=flat&logo=docker&link=ghcr.io%2Fkai-tub%2Frico-hdl">
 <img alt="Static Badge MIT License" src="https://img.shields.io/badge/License-MIT-blue?style=flat&link=https%3A%2F%2Fopensource.org%2Flicenses%2Fmit-0">
-<img alt="Tests Status Badge" src="https://github.com/kai-tub/rs-tensor-encoder/actions/workflows/nix.yml/badge.svg">
+<img alt="Tests Status Badge" src="https://github.com/kai-tub/rico-hdl/actions/workflows/nix.yml/badge.svg">
 
 ## Overview
 
@@ -34,14 +33,14 @@ To make this possible, the application is packaged in two different ways as an:
 - [OCI Container (often called Docker image)](https://opencontainers.org/).
 
 To run the application on any x86-64 Linux server, we recommend to use the `AppImage`:
-- [rs-tensor-encoder.AppImage](https://github.com/kai-tub/rs-tensor-encoder/releases/latest/download/rs-tensor-encoder.AppImage)
+- [rico-hdl.AppImage](https://github.com/kai-tub/rico-hdl/releases/latest/download/rico-hdl.AppImage)
 
 The docker image can be used to run it on other operating systems:
-- [ghcr.io/kai-tub/rs-tensor-encoder:latest](https://github.com/kai-tub/rs-tensor-encoder/pkgs/container/rs-tensor-encoder)
+- [ghcr.io/kai-tub/rico-hdl:latest](https://github.com/kai-tub/rico-hdl/pkgs/container/rico-hdl)
 
 ### Supported Remote Sensing Datasets
 
-Currently, `rs-tensor-encoder` supports:
+Currently, `rico-hdl` supports:
 - [BigEarthNet-S1 v2.0][ben]
 - [BigEarthNet-S2 v2.0][ben]
 - [BigEarthNet-MM v2.0 (joining S1 + S2)][ben]
@@ -51,13 +50,13 @@ Additional datasets will be added in the near future!
 
 ## [BigEarthNet][ben] Example
 
-First, [downloaded the rs-tensor-encoder](#Download) binary and install
+First, [downloaded the rico-hdl](#Download) binary and install
 the [lmdb][pyl] and [saftensors][pys] Python packages.
 Then, to convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.0][ben]
 dataset into the optimized format, call the application with:
 
 ```bash
-rs-tensor-encoder --bigearthnet-s1-root <S1_ROOT_DIR> --bigearthnet-s2-root <S2_ROOT_DIR> Encoded-BigEarthNet
+rico-hdl --bigearthnet-s1-root <S1_ROOT_DIR> --bigearthnet-s2-root <S2_ROOT_DIR> Encoded-BigEarthNet
 ```
 
 In BigEarthNet, each band is stored as a separate file with the associate band as a suffix (`_B01`, `_B12`, `_VV`, ...).
@@ -91,10 +90,10 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
 </details>
 
 <details>
-  <summary>LMDB result</summary> 
+  <summary>LMDB result</summary>
 
 ```
-'S1A_IW_GRDH_1SDV_20170613T165043_33UUP_65_63': 
+'S1A_IW_GRDH_1SDV_20170613T165043_33UUP_65_63':
   {
     'VH': <120x120 float32 safetensors image data>
     'VV': <120x120 float32 safetensors image data>
@@ -115,7 +114,7 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
     'B12': <120x120 uint16 safetensors image data>,
   }
 ```
-  
+
 </details>
 
 The following code shows how to access the converted database:
@@ -127,7 +126,7 @@ import lmdb
 from safetensors.numpy import load
 from pathlib import Path
 
-# path to the encoded dataset/output of rs-tensor-encoder
+# path to the encoded dataset/output of rico-hdl
 encoded_path = Path("./Encoded-BigEarthNet")
 
 # Make sure to only open the environment once
@@ -140,7 +139,7 @@ with env.begin() as txn:
 
 rgb_bands = ["B04", "B03", "B02"]
 rgb_tensor = np.stack([safetensor_dict[b] for b in rgb_bands])
-assert rgb_tensor.shape == (3, 120, 120) 
+assert rgb_tensor.shape == (3, 120, 120)
 ```
 
 
@@ -153,13 +152,13 @@ that shows how to utilize the encoded data for high-throughput deep-learning.
 
 ### [HySpecNet-11k][hyspecnet] Example
 
-First, [downloaded the rs-tensor-encoder](#Download) binary and install
+First, [downloaded the rico-hdl](#Download) binary and install
 the [lmdb][pyl] and [saftensors][pys] Python packages.
 Then, to convert the patches from the [HySpecNet-11k][hyspecnet]
 dataset into the optimized format, call the application with:
 
 ```bash
-rs-tensor-encoder --hyspecnet <HYSPECNET_ROOT_DIR> encoded-hyspecnet
+rico-hdl --hyspecnet <HYSPECNET_ROOT_DIR> encoded-hyspecnet
 ```
 
 In [HySpecNet-11k][hyspecnet], each patch contains 224 bands.
@@ -259,7 +258,7 @@ with env.begin() as txn:
   safetensor_dict = load(txn.get("ENMAP01-____L2A-DT0000004950_20221103T162438Z_001_V010110_20221118T145147Z-Y01460273_X04390566".encode()))
 
 hyspecnet_bands = range(1, 225)
-# recommendation from HySpecNet-11k paper 
+# recommendation from HySpecNet-11k paper
 skip_bands = [126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 160, 161, 162, 163, 164, 165, 166]
 tensor = np.stack([safetensor_dict[f"B{k}"] for k in hyspecnet_bands if k not in skip_bands])
 assert tensor.shape == (202, 128, 128)
@@ -291,7 +290,7 @@ It effectively utilizes the operating system's buffer cache and allows seamless 
 These properties make it an excellent choice for environments where multiple users require access to the same data,
 which is common in deep-learning research.
 
-One significant advantage of choosing [LMDB][LMDB] over more array-structured solutions like 
+One significant advantage of choosing [LMDB][LMDB] over more array-structured solutions like
 [netcdf](https://www.unidata.ucar.edu/software/netcdf/) or [Zarr](https://zarr.dev/)
 is that it is better aligned with the access patterns and dataset characteristics specific
 to remote sensing deep-learning datasets.

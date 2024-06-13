@@ -9,9 +9,10 @@
 
 ## Overview
 
-The core idea is to run the encoder _once_ on a supported remote sensing dataset.
-The encoder will convert the remote sensing images into a DL-optimized format.
-The resulting file will provide significantly higher throughput than the original
+The core idea is to run the encoder on a supported remote sensing dataset and use the resulting
+output to efficiently train deep-learning models.
+The encoder converts the remote sensing images into a DL-optimized format.
+The resulting output will provide significantly higher throughput than the original
 remote sensing images (patches)
 and should be used instead of the unprocessed dataset.
 The data is encoded in a DL-library independent format, ensuring flexible use.
@@ -25,11 +26,11 @@ To access the data with Python, install the [LMDB][LMDB] and [safetensors][s] pa
 
 ### Download
 
-Great care has been taken to ensure that the application can effortlessly run on different environments
+Great care has been taken to ensure the application can effortlessly run on different environments
 without requiring additional dependencies on the server.
 To make this possible, the application is packaged in two different ways as an:
 
-- [AppImage](https://appimage.org/) and an
+- [AppImage](https://appimage.org/) and
 - [OCI Container (often called Docker image)](https://opencontainers.org/).
 
 To run the application on any x86-64 Linux server, we recommend to use the `AppImage`:
@@ -43,15 +44,15 @@ The docker image can be used to run it on other operating systems:
 Currently, `rico-hdl` supports:
 - [BigEarthNet-S1 v2.0][ben]
 - [BigEarthNet-S2 v2.0][ben]
-- [BigEarthNet-MM v2.0 (joining S1 + S2)][ben]
+- [BigEarthNet-MM v2.0][ben]
 - [HySpecNet-11k][hyspecnet]
 
-Additional datasets will be added in the near future!
+Additional datasets will be added in the near future.
 
 ## [BigEarthNet][ben] Example
 
-First, [downloaded the rico-hdl](#Download) binary and install
-the [lmdb][pyl] and [saftensors][pys] Python packages.
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
 Then, to convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.0][ben]
 dataset into the optimized format, call the application with:
 
@@ -90,7 +91,7 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
 </details>
 
 <details>
-  <summary>LMDB result</summary>
+  <summary>LMDB Result</summary>
 
 ```
 'S1A_IW_GRDH_1SDV_20170613T165043_33UUP_65_63':
@@ -146,14 +147,14 @@ assert rgb_tensor.shape == (3, 120, 120)
 > [!TIP]
 > Remember to use the appropriate `load` function for a given deep-learning library.
 
-The [ConfigILM](https://github.com/lhackel-tub/ConfigILM) library provides [an excellent
+The [ConfigILM](https://github.com/lhackel-tub/ConfigILM) library provides [an
 LMDB reader example](https://github.com/lhackel-tub/ConfigILM/blob/main/configilm/extra/BENv2_utils.py)
 that shows how to utilize the encoded data for high-throughput deep-learning.
 
 ### [HySpecNet-11k][hyspecnet] Example
 
-First, [downloaded the rico-hdl](#Download) binary and install
-the [lmdb][pyl] and [saftensors][pys] Python packages.
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
 Then, to convert the patches from the [HySpecNet-11k][hyspecnet]
 dataset into the optimized format, call the application with:
 
@@ -200,7 +201,7 @@ integration_tests/tiffs/HySpecNet-11k
 </details>
 
 <details>
-  <summary>LMDB result</summary>
+  <summary>LMDB Result</summary>
 
 > [!INFO]
 > The encoder will only process the image data (`SPECTRAL_IMAGE.TIF`)
@@ -293,7 +294,7 @@ which is common in deep-learning research.
 One significant advantage of choosing [LMDB][LMDB] over more array-structured solutions like
 [netcdf](https://www.unidata.ucar.edu/software/netcdf/) or [Zarr](https://zarr.dev/)
 is that it is better aligned with the access patterns and dataset characteristics specific
-to remote sensing deep-learning datasets.
+to remote sensing datasets for deep-learning.
 Remote sensing deep-learning datasets typically consist of small images
 (usually around 120px x 120px) with varying resolutions based on the selected band
 (e.g., BigEarthNet's highest resolution is 120px x 120px and the lowest is 20px x 20px).

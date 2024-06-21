@@ -118,6 +118,7 @@
             rustfmt
             rust-analyzer
             cargo-flamegraph
+            fd
           ]);
         BINDGEN_EXTRA_CLANG_ARGS = [
           ''
@@ -126,6 +127,26 @@
         LIBCLANG_PATH =
           pkgs.lib.makeLibraryPath
           [pkgs.llvmPackages_latest.libclang.lib];
+      };
+      py = pkgs.devshell.mkShell {
+        packages = [
+          (pkgs.python312.withPackages
+            (ps: (with ps; [
+              # jupyter
+              pipe
+              safetensors
+              lmdb
+              rasterio
+              ipython
+              natsort
+              more-itertools
+              typer
+              python-lsp-server
+              python-lsp-ruff
+              tqdm
+              structlog
+            ])))
+        ];
       };
       test = pkgs.devshell.mkShell {
         env = [

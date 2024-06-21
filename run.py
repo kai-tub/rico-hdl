@@ -21,9 +21,7 @@ BIGEARTHNET_S2_ORDERING = [
 
 def read_single_band_raster(path):
     with rasterio.open(path) as r:
-        d = r.read(1)
-        print(d.shape)
-        return d
+        return r.read(1)
 
 def s2_safetensor_generator(lmdb_key: str, files: list[Path]) -> bytes:
     # In Python the dictionary insertion order is stable!
@@ -31,8 +29,6 @@ def s2_safetensor_generator(lmdb_key: str, files: list[Path]) -> bytes:
     # to order the safetensor entries!
     files = sorted(files, key=lambda f: BIGEARTHNET_S2_ORDERING.index(f.stem[-3:]))
     data = {f.stem[-3:]: read_single_band_raster(f) for f in files}
-    print(data)
-    log.debug(f"Data Keys: {data.keys()}")
     return save(data, metadata=None)
 
 
@@ -100,8 +96,8 @@ def main(
         log.debug("About to serialize data in chunks")
         for keys_chunk in tqdm(chunked(lmdb_keys, 512)):
             with env.begin(write=True) as txn:
+                log.debug(f"First key of the chunk is: {keys_chunk[0]}")
                 for key in keys_chunk:
-                    log.debug(f"writing key: {key}")
                     if not txn.put(str(key).encode(), s2_safetensor_generator(key, grouped[key]), overwrite=False):
                         sys.exit("Program is overwriting data in the DB! This should never happen!")
 

@@ -95,7 +95,7 @@ def main(
 
         lmdb_keys = natsorted(grouped.keys())
         log.debug("About to serialize data in chunks")
-        for keys_chunk in tqdm(chunked(lmdb_keys, 512)):
+        for keys_chunk in tqdm(list(chunked(lmdb_keys, 512))):
             with env.begin(write=True) as txn:
                 log.debug(f"First key of the chunk is: {keys_chunk[0]}")
                 # with futures.ThreadPoolExecutor(max_workers=64) as executor:

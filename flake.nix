@@ -133,7 +133,6 @@
           (pkgs.python312.withPackages
             (ps: (with ps; [
               # jupyter
-              pipe
               safetensors
               lmdb
               rasterio

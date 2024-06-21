@@ -21,19 +21,23 @@ BIGEARTHNET_S2_ORDERING = [
 
 def read_single_band_raster(path):
     with rasterio.open(path) as r:
-        return r.read(1)
+        d = r.read(1)
+        print(d.shape)
+        return d
 
-def s2_safetensor_generator(lmdb_key: str, files: list[Path]):
+def s2_safetensor_generator(lmdb_key: str, files: list[Path]) -> bytes:
     # In Python the dictionary insertion order is stable!
     # order the data here to make it clear that we are doing it
     # to order the safetensor entries!
     files = sorted(files, key=lambda f: BIGEARTHNET_S2_ORDERING.index(f.stem[-3:]))
-    data = {f.stem[-3]: read_single_band_raster(f) for f in files}
-    save(data, metadata=None)
+    data = {f.stem[-3:]: read_single_band_raster(f) for f in files}
+    print(data)
+    log.debug(f"Data Keys: {data.keys()}")
+    return save(data, metadata=None)
 
 
 def main(
-    s2_directory: Annotated[
+    bigearthnet_s2_directory: Annotated[
         Path,
         typer.Option(
             exists=True,
@@ -50,7 +54,7 @@ def main(
             resolve_path=True,
         )
     ]):
-        log.info(f"Loading data from: {s2_directory}")
+        log.info(f"Loading data from: {bigearthnet_s2_directory}")
 
         s2_files = subprocess.check_output(
            [
@@ -59,6 +63,8 @@ def main(
                "--no-ignore",
                "--show-errors",
                f"--threads={os.cpu_count()}", # use number of available CPU cores by default
+               f"--base-directory={bigearthnet_s2_directory}",
+               "--absolute-path",
                "--regex",
                "S2[AB]_MSIL2A_.*_B[018][0-9A].tiff?$",
             ],
@@ -75,7 +81,8 @@ def main(
         # group by the prefix and
         grouped = defaultdict(list)
         for f in s2_files:
-            grouped[f.parent].append(f)
+            # remove the band suffix
+            grouped[f.stem.rsplit("_", 1)[0]].append(f)
 
         log.debug("Checking that each patch directory is complete")
         for group, value_list in grouped.items():
@@ -94,6 +101,7 @@ def main(
         for keys_chunk in tqdm(chunked(lmdb_keys, 512)):
             with env.begin(write=True) as txn:
                 for key in keys_chunk:
+                    log.debug(f"writing key: {key}")
                     if not txn.put(str(key).encode(), s2_safetensor_generator(key, grouped[key]), overwrite=False):
                         sys.exit("Program is overwriting data in the DB! This should never happen!")
 

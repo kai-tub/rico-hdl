@@ -90,7 +90,7 @@ def main(
 
         log.debug(f"Creating LMDB database: {target_dir}")
         # 1TB for map_size
-        env = lmdb.open(str(target_dir), readonly=False, create=True, map_size=(1 * 1024 * 1024 * 1024))
+        env = lmdb.open(str(target_dir), readonly=False, create=True, map_size=(1 * 1024 * 1024 * 1024 * 1024))
 
         lmdb_keys = natsorted(grouped.keys())
         log.debug("About to serialize data in chunks")

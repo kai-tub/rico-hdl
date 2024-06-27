@@ -130,6 +130,7 @@
       };
       py = pkgs.devshell.mkShell {
         packages = [
+          pkgs.fd
           (pkgs.python312.withPackages
             (ps: (with ps; [
               # jupyter

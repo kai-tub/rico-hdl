@@ -12,7 +12,14 @@ from collections import defaultdict
 from natsort import natsorted
 from more_itertools import chunked
 from tqdm import tqdm
-# from concurrent import futures
+from concurrent.futures import as_completed, ProcessPoolExecutor
+
+# multiprocessing.shared_memory
+# I do not believe that this is necessary.
+# I could create a list of strings for each call and write that into a shared_memory region
+# but I believe that chunking the entire data per process and then iterating over the chunks
+# Just use spawn to create new sub-interpreters as the time of creating them the first time should be almost negligible.
+#
 
 log = structlog.get_logger()
 
@@ -95,18 +102,33 @@ def main(
 
         lmdb_keys = natsorted(grouped.keys())
         log.debug("About to serialize data in chunks")
-        for keys_chunk in tqdm(list(chunked(lmdb_keys, 512))):
-            with env.begin(write=True) as txn:
-                log.debug(f"First key of the chunk is: {keys_chunk[0]}")
-                # with futures.ThreadPoolExecutor(max_workers=64) as executor:
-                    # future_to_key = {executor.submit(writer, txn, key, grouped[key]): key for key in keys_chunk}
-                    # for future in futures.as_completed(future_to_key):
-                    #     if not future.result():
-                    #         sys.exit(f"Program is overwriting data {future_to_key[future]} in the DB! This should never happen!")
-
-                for key in keys_chunk:
-                  if not txn.put(str(key).encode(), s2_safetensor_generator(key, grouped[key]), overwrite=False):
+        # HERE:
+        # create chunks as lists so that the underlying process functions can be called
+        # env.begin(write=True) must be created in each underlying process
+        # > One simultaneous write transaction is allowed,
+        #
+        # LMDB will probably hold the connection open and serialize the writing on its own
+        # -> Presumably the goal should be to have parallel producers that generate the
+        # safetensor byte data and that is then consumed by a single consumer, ideally
+        # without copying the data across processes, i.e. using shared memory
+        # since it is only a 'bytes' type at this stage
+        # use a multiprocessing.Queue to easily share results, even if shared_memory would be better
+        # using the same ProcessPool assign all of them the appropriate key, paths combination
+        # and then let them produce and consume the results, writing them into the lmdb file
+        with ProcessPoolExecutor(max_workers=32) as executor:
+            # chunk size limits the number of writes per transaction
+            # and the maximum number of futures that needs to be processed
+            for keys_chunk in tqdm(list(chunked(lmdb_keys, 512))):
+                with env.begin(write=True) as txn:
+                    log.debug(f"First key of the chunk is: {keys_chunk[0]}")
+                    futures_to_lmdb_key = {executor.submit(s2_safetensor_generator, lmdb_key, grouped[lmdb_key]): lmdb_key for lmdb_key in keys_chunk}
+                    for future in as_completed(futures_to_lmdb_key):
+                        if not txn.put(str(futures_to_lmdb_key[future]).encode(), future.result(), overwrite=False):
                             sys.exit("Program is overwriting data in the DB! This should never happen!")
+
+                    # for key in keys_chunk:
+                    #   if not txn.put(str(key).encode(), s2_safetensor_generator(key, grouped[key]), overwrite=False):
+                    #             sys.exit("Program is overwriting data in the DB! This should never happen!")
 
 if __name__ == "__main__":
     typer.run(main)

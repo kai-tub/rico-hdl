@@ -12,8 +12,8 @@ from collections import defaultdict
 from more_itertools import chunked
 from tqdm import tqdm
 from concurrent.futures import as_completed, ProcessPoolExecutor
+import multiprocessing as mp
 
-# multiprocessing.shared_memory
 # I do not believe that this is necessary.
 # I could create a list of strings for each call and write that into a shared_memory region
 # but I believe that chunking the entire data per process and then iterating over the chunks
@@ -117,7 +117,7 @@ def main(
         # use a multiprocessing.Queue to easily share results, even if shared_memory would be better
         # using the same ProcessPool assign all of them the appropriate key, paths combination
         # and then let them produce and consume the results, writing them into the lmdb file
-        with ProcessPoolExecutor(max_workers=32) as executor:
+        with ProcessPoolExecutor(max_workers=None, mp_context=mp.get_context("spawn")) as executor:
             # chunk size limits the number of writes per transaction
             # and the maximum number of futures that needs to be processed
             for keys_chunk in tqdm(list(chunked(grouped.keys(), 512))):

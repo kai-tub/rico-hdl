@@ -9,7 +9,6 @@ from pathlib import Path
 import subprocess
 import structlog
 from collections import defaultdict
-from natsort import natsorted
 from more_itertools import chunked
 from tqdm import tqdm
 from concurrent.futures import as_completed, ProcessPoolExecutor
@@ -27,16 +26,16 @@ BIGEARTHNET_S2_ORDERING = [
     "B02", "B03", "B04", "B08", "B05", "B06", "B07", "B8A", "B10", "B11", "B12", "B01", "B09",
 ]
 
-def read_single_band_raster(path):
+def read_single_band_raster(path: str):
     with rasterio.open(path) as r:
         return r.read(1)
 
-def s2_safetensor_generator(lmdb_key: str, files: list[Path]) -> bytes:
+def s2_safetensor_generator(lmdb_key: str, files: list[str]) -> bytes:
     # In Python the dictionary insertion order is stable!
     # order the data here to make it clear that we are doing it
     # to order the safetensor entries!
-    files = sorted(files, key=lambda f: BIGEARTHNET_S2_ORDERING.index(f.stem[-3:]))
-    data = {f.stem[-3:]: read_single_band_raster(f) for f in files}
+    files = sorted(files, key=lambda f: BIGEARTHNET_S2_ORDERING.index(f.rsplit(".", 1)[0][-3:]))
+    data = {f.rsplit(".", 1)[0][-3:]: read_single_band_raster(f) for f in files}
     return save(data, metadata=None)
 
 
@@ -74,8 +73,6 @@ def main(
             ],
             text=True
         ).splitlines()
-        s2_files = [Path(f) for f in s2_files]
-
         num_s2_files = len(s2_files)
 
         assert num_s2_files > 0
@@ -85,8 +82,12 @@ def main(
         # group by the prefix and
         grouped = defaultdict(list)
         for f in s2_files:
-            # remove the band suffix
-            grouped[f.stem.rsplit("_", 1)[0]].append(f)
+            # remove the file-extension and band suffix
+            grouped[
+                f.rsplit(".", 1)[0].rsplit("_", 1)[0]
+            ].append(f)
+        # remove the large collection of Path items
+        del s2_files
 
         log.debug("Checking that each patch directory is complete")
         for group, value_list in grouped.items():
@@ -100,7 +101,8 @@ def main(
         # 1TB for map_size
         env = lmdb.open(str(target_dir), readonly=False, create=True, map_size=(1 * 1024 * 1024 * 1024 * 1024))
 
-        lmdb_keys = natsorted(grouped.keys())
+        # there is no need to order the keys, as data will be ordered by LMDB
+        # lmdb_keys = natsorted(grouped.keys())
         log.debug("About to serialize data in chunks")
         # HERE:
         # create chunks as lists so that the underlying process functions can be called
@@ -118,7 +120,7 @@ def main(
         with ProcessPoolExecutor(max_workers=32) as executor:
             # chunk size limits the number of writes per transaction
             # and the maximum number of futures that needs to be processed
-            for keys_chunk in tqdm(list(chunked(lmdb_keys, 512))):
+            for keys_chunk in tqdm(list(chunked(grouped.keys(), 512))):
                 with env.begin(write=True) as txn:
                     log.debug(f"First key of the chunk is: {keys_chunk[0]}")
                     futures_to_lmdb_key = {executor.submit(s2_safetensor_generator, lmdb_key, grouped[lmdb_key]): lmdb_key for lmdb_key in keys_chunk}

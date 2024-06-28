@@ -306,5 +306,9 @@ def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
                         )
 
 
-if __name__ == "__main__":
+def main():
     app()
+
+
+if __name__ == "__main__":
+    main()

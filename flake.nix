@@ -8,6 +8,7 @@
     nix-appimage = {
       url = "github:ralismark/nix-appimage";
     };
+    poetry2nix.url = "github:nix-community/poetry2nix";
   };
   outputs = {
     self,
@@ -50,31 +51,31 @@
     );
     packages = eachSystem (system: let
       pkgs = pkgsFor.${system};
+      inherit (inputs.poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryApplication;
     in rec {
       default = rico-hdl;
 
-      # rico-hdl = pkgs.rico-hdl;
-      rico-hdl = pkgs.python312Packages.buildPythonApplication {
-        pname = "rico-hdl";
-        version = "0.1.0";
-        src = inputs.nix-filter {
-          root = ./.;
-          include = ["src/"];
-        };
-
-        # maybe fd should be buildInputs?
-        dependencies =
-          (with pkgs.python312Packages; [
-            safetensors
-            lmdb
-            rasterio
-            more-itertools
-            typer
-            rich
-            shellingham
-          ])
-          ++ [pkgs.fd];
+      rico-hdl = mkPoetryApplication {
+        projectDir = ./.;
+        preferWheels = true;
+        python = pkgs.python312;
       };
+
+      # maybe fd should be buildInputs?
+      #   dependencies =
+      #     (with pkgs.python312Packages; [
+      #       safetensors
+      #       lmdb
+      #       rasterio
+      #       more-itertools
+      #       typer
+      #       rich
+      #       shellingham
+      #       tqdm
+      #       structlog
+      #     ])
+      #     ++ [pkgs.fd];
+      # };
 
       rico-hdl-AppImage = inputs.nix-appimage.mkappimage.${system} {
         drv = rico-hdl;
@@ -159,8 +160,6 @@
               python-lsp-server
               python-lsp-ruff
               ipython
-              tqdm
-              structlog
             ])))
         ];
       };

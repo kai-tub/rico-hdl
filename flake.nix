@@ -55,14 +55,20 @@
     in rec {
       default = rico-hdl;
 
+      # Wrapping idea from:
+      # https://discourse.nixos.org/t/adding-non-python-dependencies-to-poetry2nix-application/26755/6
       rico-hdl = mkPoetryApplication {
         projectDir = ./.;
         preferWheels = true;
         nativeBuildInputs = [pkgs.makeBinaryWrapper];
+        # maybe it is possible to rename the wrapper so that the
+        # wrapped binary doesn't have an ugly name?
+        propogatedBuildInputs = [pkgs.fd];
         postInstall = ''
           wrapProgram "$out/bin/rico-hdl" \
             --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.fd]}
         '';
+        meta.mainProgram = "rico-hdl";
         # this breaks LMDB
         # python = pkgs.python312;
         # no idea how to write this:
@@ -124,6 +130,7 @@
     devShells = eachSystem (system: let
       pkgs = pkgsFor.${system};
       buildPackage = inputs.self.packages.${system}.default;
+      inherit (inputs.poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryEnv;
     in {
       default = pkgs.mkShell {
         inherit (self.checks.${system}.pre-commit-check) shellHook;
@@ -150,14 +157,19 @@
       };
       py = pkgs.devshell.mkShell {
         packages = [
-          pkgs.fd
-          (pkgs.python312.withPackages
-            (ps: (with ps; [
-              # jupyter
-              python-lsp-server
-              python-lsp-ruff
-              ipython
-            ])))
+          (mkPoetryEnv
+            {
+              projectDir = ./.;
+              preferWheels = true;
+            })
+          # pkgs.fd
+          # (pkgs.python312.withPackages
+          #   (ps: (with ps; [
+          #     # jupyter
+          #     python-lsp-server
+          #     python-lsp-ruff
+          #     ipython
+          #   ])))
         ];
       };
       test = pkgs.devshell.mkShell {

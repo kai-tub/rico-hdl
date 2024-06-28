@@ -69,7 +69,7 @@
             --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.fd]}
         '';
         meta.mainProgram = "rico-hdl";
-        # this breaks LMDB
+        # Python312 breaks LMDB...
         # python = pkgs.python312;
         # no idea how to write this:
         # overrides = poetry2nix.overrides.withDefaults (final: prev: {
@@ -117,8 +117,8 @@
             pythonTestDeps)
         ];
         text = ''
-          export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/S1}
-          export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/S2}
+          export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
+          export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
           export ENCODER_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
           export ENCODER_EXEC_PATH=${pkgs.lib.getExe rico-hdl}
           echo "Running Python integration tests."
@@ -129,62 +129,21 @@
 
     devShells = eachSystem (system: let
       pkgs = pkgsFor.${system};
-      buildPackage = inputs.self.packages.${system}.default;
       inherit (inputs.poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryEnv;
     in {
-      default = pkgs.mkShell {
-        inherit (self.checks.${system}.pre-commit-check) shellHook;
-        nativeBuildInputs = buildPackage.nativeBuildInputs;
-        buildInputs =
-          buildPackage.buildInputs
-          ++ self.checks.${system}.pre-commit-check.enabledPackages
-          ++ (with pkgs; [
-            # glibc
-            rustc
-            cargo
-            rustfmt
-            rust-analyzer
-            cargo-flamegraph
-            fd
-          ]);
-        BINDGEN_EXTRA_CLANG_ARGS = [
-          ''
-            -I"${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include"''
-        ];
-        LIBCLANG_PATH =
-          pkgs.lib.makeLibraryPath
-          [pkgs.llvmPackages_latest.libclang.lib];
-      };
-      py = pkgs.devshell.mkShell {
-        packages = [
-          (mkPoetryEnv
-            {
-              projectDir = ./.;
-              preferWheels = true;
-            })
-          # pkgs.fd
-          # (pkgs.python312.withPackages
-          #   (ps: (with ps; [
-          #     # jupyter
-          #     python-lsp-server
-          #     python-lsp-ruff
-          #     ipython
-          #   ])))
-        ];
-      };
-      test = pkgs.devshell.mkShell {
+      default = pkgs.devshell.mkShell {
         env = [
+          # {
+          #   name = "PYTHONPATH";
+          #   prefix = "${pkgs.python3Packages.ipykernel}/${pkgs.python3.sitePackages}";
+          # }
           {
-            name = "JUPYTER_PATH";
-            value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
-          }
-          {
-            name = "PYTHONPATH";
-            prefix = "${pkgs.python3Packages.ipykernel}/${pkgs.python3.sitePackages}";
+            name = "ENCODER_HYSPECNET_PATH";
+            value = "./integration_tests/tiffs/HySpecNet-11k/";
           }
           {
             name = "ENCODER_S1_PATH";
-            value = "./integration_tests/tiffs/BigEarthNet/S1";
+            value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
           }
           {
             # seems to be some permission issues with walkdir
@@ -193,27 +152,63 @@
             # and copying from the directory to the local directory
             # also works
             name = "ENCODER_S2_PATH";
-            value = "./integration_tests/tiffs/BigEarthNet/S2";
+            value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
           }
           {
             name = "ENCODER_EXEC_PATH";
-            # value = "./results/bin/encoder";
             value = "${inputs.self.packages.${system}.rico-hdl-AppImage}";
-          }
-          {
-            name = "RUST_BACKTRACE";
-            value = "1";
           }
         ];
         packages = [
-          (
-            # ATTENTION! Care has to be taken to ensure that the
-            # safetensors python version matches the version used in the cargo.lock file!
-            pkgs.python3.withPackages
-            (ps: (pythonTestDeps ps) ++ (with ps; [jupyter ipython more-itertools blosc2]))
-          )
+          (mkPoetryEnv
+            {
+              projectDir = ./.;
+              preferWheels = true;
+            })
         ];
       };
+      # rust = pkgs.mkShell {
+      #   inherit (self.checks.${system}.pre-commit-check) shellHook;
+      #   nativeBuildInputs = buildPackage.nativeBuildInputs;
+      #   buildInputs =
+      #     buildPackage.buildInputs
+      #     ++ self.checks.${system}.pre-commit-check.enabledPackages
+      #     ++ (with pkgs; [
+      #       # glibc
+      #       rustc
+      #       cargo
+      #       rustfmt
+      #       rust-analyzer
+      #       cargo-flamegraph
+      #       fd
+      #     ]);
+      #   BINDGEN_EXTRA_CLANG_ARGS = [
+      #     ''
+      #       -I"${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include"''
+      #   ];
+      #   LIBCLANG_PATH =
+      #     pkgs.lib.makeLibraryPath
+      #     [pkgs.llvmPackages_latest.libclang.lib];
+      # };
+      # test = pkgs.devshell.mkShell {
+      #   env = [
+      #     {
+      #       name = "JUPYTER_PATH";
+      #       value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
+      #     }
+      #       name = "RUST_BACKTRACE";
+      #       value = "1";
+      #     }
+      #   ];
+      #   packages = [
+      #     (
+      #       # ATTENTION! Care has to be taken to ensure that the
+      #       # safetensors python version matches the version used in the cargo.lock file!
+      #       pkgs.python3.withPackages
+      #       (ps: (pythonTestDeps ps) ++ (with ps; [jupyter ipython more-itertools blosc2]))
+      #     )
+      #   ];
+      # };
     });
   };
 }

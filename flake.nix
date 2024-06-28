@@ -58,24 +58,21 @@
       rico-hdl = mkPoetryApplication {
         projectDir = ./.;
         preferWheels = true;
-        python = pkgs.python312;
+        nativeBuildInputs = [pkgs.makeBinaryWrapper];
+        postInstall = ''
+          wrapProgram "$out/bin/rico-hdl" \
+            --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.fd]}
+        '';
+        # this breaks LMDB
+        # python = pkgs.python312;
+        # no idea how to write this:
+        # overrides = poetry2nix.overrides.withDefaults (final: prev: {
+        #   lmdb = prev.lmdb.overridePythonAttrs (old: {
+        #     LMDB_FORCE_SYSTEM=1;
+        #   });
+        # })
+        # nativeBuildInputs = [pkgs.lmdb];
       };
-
-      # maybe fd should be buildInputs?
-      #   dependencies =
-      #     (with pkgs.python312Packages; [
-      #       safetensors
-      #       lmdb
-      #       rasterio
-      #       more-itertools
-      #       typer
-      #       rich
-      #       shellingham
-      #       tqdm
-      #       structlog
-      #     ])
-      #     ++ [pkgs.fd];
-      # };
 
       rico-hdl-AppImage = inputs.nix-appimage.mkappimage.${system} {
         drv = rico-hdl;

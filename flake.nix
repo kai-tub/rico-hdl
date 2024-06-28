@@ -17,7 +17,8 @@
     ...
   } @ inputs: let
     eachSystem = nixpkgs.lib.genAttrs (import systems);
-    pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
+    # pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
+    pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}.extend devshell.overlays.default));
     pythonTestDeps = ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest];
   in {
     overlays = import ./nix/overlays.nix {
@@ -52,7 +53,28 @@
     in rec {
       default = rico-hdl;
 
-      rico-hdl = pkgs.rico-hdl;
+      # rico-hdl = pkgs.rico-hdl;
+      rico-hdl = pkgs.python312Packages.buildPythonApplication {
+        pname = "rico-hdl";
+        version = "0.1.0";
+        src = inputs.nix-filter {
+          root = ./.;
+          include = ["src/"];
+        };
+
+        # maybe fd should be buildInputs?
+        dependencies =
+          (with pkgs.python312Packages; [
+            safetensors
+            lmdb
+            rasterio
+            more-itertools
+            typer
+            rich
+            shellingham
+          ])
+          ++ [pkgs.fd];
+      };
 
       rico-hdl-AppImage = inputs.nix-appimage.mkappimage.${system} {
         drv = rico-hdl;
@@ -134,15 +156,9 @@
           (pkgs.python312.withPackages
             (ps: (with ps; [
               # jupyter
-              safetensors
-              lmdb
-              rasterio
-              ipython
-              natsort
-              more-itertools
-              typer
               python-lsp-server
               python-lsp-ruff
+              ipython
               tqdm
               structlog
             ])))

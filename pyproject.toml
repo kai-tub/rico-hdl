@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "rico-hdl"
+version = "0.1.0"
+description = "A fast and easy-to-use Remote sensing Image format COnverter for High-throughput Deep-Learning (rico-hdl)."
+authors = ["Kai Norman Clasen <k.clasen@tu-berlin.de>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.12"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

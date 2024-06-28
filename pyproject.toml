@@ -19,6 +19,7 @@ structlog = "^24.2.0"
 tqdm = "^4.66.4"
 
 
+cffi = "^1.16.0"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
 

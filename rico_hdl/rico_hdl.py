@@ -102,7 +102,7 @@ def s1_read_tif(path: Path):
 
 def zstd_compressor(data: bytes) -> bytes:
     return blosc2.compress2(
-        data, codec=blosc2.Codec.ZSTD, clevel=9, filters=[blosc2.Filter.BITSHUFFLE]
+        data, codec=blosc2.Codec.ZSTD, clevel=1, filters=[blosc2.Filter.BITSHUFFLE]
     )
 
 
@@ -313,6 +313,11 @@ def lmdb_writer(
     # to maximize efficiency
     # Use `spawn` as this is POSIX compliant and will be the default in the future:
     # https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
+    # limit the thread-based parallelism as we are about to spawn multiple processes
+    # and the reasoning is that the disk-access is probably slower than the compression
+    # -> Better to have multiple processes
+    if compress:
+        blosc2.set_nthreads(2)
     with ProcessPoolExecutor(
         max_workers=None, mp_context=mp.get_context("spawn")
     ) as executor:

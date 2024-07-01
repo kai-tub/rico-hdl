@@ -57,7 +57,7 @@ Then, to convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.
 dataset into the optimized format, call the application with:
 
 ```bash
-rico-hdl --bigearthnet-s1-root <S1_ROOT_DIR> --bigearthnet-s2-root <S2_ROOT_DIR> Encoded-BigEarthNet
+rico-hdl bigearthnet --bigearthnet-s1-dir <S1_ROOT_DIR> --bigearthnet-s2-dir <S2_ROOT_DIR> --target-dir Encoded-BigEarthNet
 ```
 
 In BigEarthNet, each band is stored as a separate file with the associate band as a suffix (`_B01`, `_B12`, `_VV`, ...).
@@ -159,7 +159,7 @@ Then, to convert the patches from the [HySpecNet-11k][hyspecnet]
 dataset into the optimized format, call the application with:
 
 ```bash
-rico-hdl --hyspecnet <HYSPECNET_ROOT_DIR> encoded-hyspecnet
+rico-hdl hyspecnet-11k --dataset-dir <HYSPECNET_ROOT_DIR> --dataset-dir Encoded-HySpecNet
 ```
 
 In [HySpecNet-11k][hyspecnet], each patch contains 224 bands.
@@ -248,7 +248,7 @@ import numpy as np
 from safetensors.numpy import load
 from pathlib import Path
 
-encoded_path = "encoded-hyspecnet"
+encoded_path = "Encoded-HySpecNet"
 
 # Make sure to only open the environment once
 # and not everytime an item is accessed.

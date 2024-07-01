@@ -8,6 +8,7 @@
     nix-appimage = {
       url = "github:ralismark/nix-appimage";
     };
+    poetry2nix.url = "github:nix-community/poetry2nix";
   };
   outputs = {
     self,
@@ -17,13 +18,10 @@
     ...
   } @ inputs: let
     eachSystem = nixpkgs.lib.genAttrs (import systems);
-    pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
+    # pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
+    pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}.extend devshell.overlays.default));
     pythonTestDeps = ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest];
   in {
-    overlays = import ./nix/overlays.nix {
-      inherit inputs;
-      lib = nixpkgs.lib;
-    };
     formatter = eachSystem (system: pkgsFor.${system}.alejandra);
     checks = eachSystem (
       system: let
@@ -49,10 +47,34 @@
     );
     packages = eachSystem (system: let
       pkgs = pkgsFor.${system};
+      inherit (inputs.poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryApplication;
     in rec {
       default = rico-hdl;
 
-      rico-hdl = pkgs.rico-hdl;
+      # Wrapping idea from:
+      # https://discourse.nixos.org/t/adding-non-python-dependencies-to-poetry2nix-application/26755/6
+      rico-hdl = mkPoetryApplication {
+        projectDir = ./.;
+        preferWheels = true;
+        nativeBuildInputs = [pkgs.makeBinaryWrapper];
+        # maybe it is possible to rename the wrapper so that the
+        # wrapped binary doesn't have an ugly name?
+        propogatedBuildInputs = [pkgs.fd];
+        postInstall = ''
+          wrapProgram "$out/bin/rico-hdl" \
+            --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.fd]}
+        '';
+        meta.mainProgram = "rico-hdl";
+        # Python312 breaks LMDB...
+        # python = pkgs.python312;
+        # no idea how to write this:
+        # overrides = poetry2nix.overrides.withDefaults (final: prev: {
+        #   lmdb = prev.lmdb.overridePythonAttrs (old: {
+        #     LMDB_FORCE_SYSTEM=1;
+        #   });
+        # })
+        # nativeBuildInputs = [pkgs.lmdb];
+      };
 
       rico-hdl-AppImage = inputs.nix-appimage.mkappimage.${system} {
         drv = rico-hdl;
@@ -91,10 +113,10 @@
             pythonTestDeps)
         ];
         text = ''
-          export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/S1}
-          export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/S2}
+          export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
+          export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
           export ENCODER_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
-          export ENCODER_EXEC_PATH=${pkgs.lib.getExe rico-hdl}
+          export ENCODER_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
           echo "Running Python integration tests."
           pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
@@ -103,43 +125,25 @@
 
     devShells = eachSystem (system: let
       pkgs = pkgsFor.${system};
-      buildPackage = inputs.self.packages.${system}.default;
+      inherit (inputs.poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryEnv;
     in {
-      default = pkgs.mkShell {
-        inherit (self.checks.${system}.pre-commit-check) shellHook;
-        nativeBuildInputs = buildPackage.nativeBuildInputs;
-        buildInputs =
-          buildPackage.buildInputs
-          ++ self.checks.${system}.pre-commit-check.enabledPackages
-          ++ (with pkgs; [
-            # glibc
-            rustc
-            cargo
-            rustfmt
-            rust-analyzer
-            cargo-flamegraph
-          ]);
-        BINDGEN_EXTRA_CLANG_ARGS = [
-          ''
-            -I"${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include"''
-        ];
-        LIBCLANG_PATH =
-          pkgs.lib.makeLibraryPath
-          [pkgs.llvmPackages_latest.libclang.lib];
-      };
-      test = pkgs.devshell.mkShell {
+      default = pkgs.devshell.mkShell {
         env = [
+          # {
+          #   name = "PYTHONPATH";
+          #   prefix = "${pkgs.python3Packages.ipykernel}/${pkgs.python3.sitePackages}";
+          # }
           {
-            name = "JUPYTER_PATH";
-            value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
-          }
-          {
-            name = "PYTHONPATH";
-            prefix = "${pkgs.python3Packages.ipykernel}/${pkgs.python3.sitePackages}";
+            name = "ENCODER_HYSPECNET_PATH";
+            value = "./integration_tests/tiffs/HySpecNet-11k/";
           }
           {
             name = "ENCODER_S1_PATH";
-            value = "./integration_tests/tiffs/BigEarthNet/S1";
+            value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
+          }
+          {
+            name = "ENCODER_LMDB_REF_DATA_PATH";
+            value = "./integration_tests/BigEarthNet_LMDB";
           }
           {
             # seems to be some permission issues with walkdir
@@ -148,25 +152,21 @@
             # and copying from the directory to the local directory
             # also works
             name = "ENCODER_S2_PATH";
-            value = "./integration_tests/tiffs/BigEarthNet/S2";
+            value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
           }
           {
-            name = "ENCODER_EXEC_PATH";
-            # value = "./results/bin/encoder";
-            value = "${inputs.self.packages.${system}.rico-hdl-AppImage}";
-          }
-          {
-            name = "RUST_BACKTRACE";
-            value = "1";
+            name = "JUPYTER_PATH";
+            # should be the python from poetry
+            value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
           }
         ];
         packages = [
-          (
-            # ATTENTION! Care has to be taken to ensure that the
-            # safetensors python version matches the version used in the cargo.lock file!
-            pkgs.python3.withPackages
-            (ps: (pythonTestDeps ps) ++ (with ps; [jupyter ipython more-itertools blosc2]))
-          )
+          (mkPoetryEnv
+            {
+              projectDir = ./.;
+              preferWheels = true;
+            })
+          pkgs.poetry
         ];
       };
     });

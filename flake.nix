@@ -22,10 +22,6 @@
     pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}.extend devshell.overlays.default));
     pythonTestDeps = ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest];
   in {
-    overlays = import ./nix/overlays.nix {
-      inherit inputs;
-      lib = nixpkgs.lib;
-    };
     formatter = eachSystem (system: pkgsFor.${system}.alejandra);
     checks = eachSystem (
       system: let
@@ -120,7 +116,7 @@
           export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
           export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
           export ENCODER_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
-          export ENCODER_EXEC_PATH=${pkgs.lib.getExe rico-hdl}
+          export ENCODER_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
           echo "Running Python integration tests."
           pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
@@ -146,6 +142,10 @@
             value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
           }
           {
+            name = "ENCODER_LMDB_REF_DATA_PATH";
+            value = "./integration_tests/BigEarthNet_LMDB";
+          }
+          {
             # seems to be some permission issues with walkdir
             # if I use ${./tiffs/...}
             # The permission all look good under the nix store
@@ -155,8 +155,9 @@
             value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
           }
           {
-            name = "ENCODER_EXEC_PATH";
-            value = "${inputs.self.packages.${system}.rico-hdl-AppImage}";
+            name = "JUPYTER_PATH";
+            # should be the python from poetry
+            value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
           }
         ];
         packages = [
@@ -165,50 +166,9 @@
               projectDir = ./.;
               preferWheels = true;
             })
+          pkgs.poetry
         ];
       };
-      # rust = pkgs.mkShell {
-      #   inherit (self.checks.${system}.pre-commit-check) shellHook;
-      #   nativeBuildInputs = buildPackage.nativeBuildInputs;
-      #   buildInputs =
-      #     buildPackage.buildInputs
-      #     ++ self.checks.${system}.pre-commit-check.enabledPackages
-      #     ++ (with pkgs; [
-      #       # glibc
-      #       rustc
-      #       cargo
-      #       rustfmt
-      #       rust-analyzer
-      #       cargo-flamegraph
-      #       fd
-      #     ]);
-      #   BINDGEN_EXTRA_CLANG_ARGS = [
-      #     ''
-      #       -I"${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include"''
-      #   ];
-      #   LIBCLANG_PATH =
-      #     pkgs.lib.makeLibraryPath
-      #     [pkgs.llvmPackages_latest.libclang.lib];
-      # };
-      # test = pkgs.devshell.mkShell {
-      #   env = [
-      #     {
-      #       name = "JUPYTER_PATH";
-      #       value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
-      #     }
-      #       name = "RUST_BACKTRACE";
-      #       value = "1";
-      #     }
-      #   ];
-      #   packages = [
-      #     (
-      #       # ATTENTION! Care has to be taken to ensure that the
-      #       # safetensors python version matches the version used in the cargo.lock file!
-      #       pkgs.python3.withPackages
-      #       (ps: (pythonTestDeps ps) ++ (with ps; [jupyter ipython more-itertools blosc2]))
-      #     )
-      #   ];
-      # };
     });
   };
 }

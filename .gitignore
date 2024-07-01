@@ -2,6 +2,7 @@
 .direnv
 .ipynb_checkpoints
 /result
+.virtual_documents/integration_tests
 *.AppImage
 __pycache__/
 artifacts/

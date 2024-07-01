@@ -1,11 +1,12 @@
 import lmdb
 import rasterio
 import numpy as np
-from pathlib import Path
 from safetensors.numpy import load
 import os
+from pathlib import Path
 import pytest
 import subprocess
+import hashlib
 
 
 def read_single_band_raster(path):
@@ -14,7 +15,7 @@ def read_single_band_raster(path):
 
 
 @pytest.fixture(scope="session")
-def s1_root():
+def s1_root() -> Path:
     str_p = os.environ.get("ENCODER_S1_PATH") or "./tiffs/BigEarthNet/BigEarthNet-S1/"
     p = Path(str_p)
     assert p.exists()
@@ -23,7 +24,16 @@ def s1_root():
 
 
 @pytest.fixture(scope="session")
-def s2_root():
+def bigearthnet_lmdb_ref_path() -> Path:
+    str_p = os.environ.get("ENCODER_LMDB_REF_PATH") or "./BigEarthNet_LMDB/"
+    p = Path(str_p)
+    assert p.exists()
+    assert p.is_dir()
+    return p
+
+
+@pytest.fixture(scope="session")
+def s2_root() -> Path:
     str_p = os.environ.get("ENCODER_S2_PATH") or "./tiffs/BigEarthNet/BigEarthNet-S2/"
     p = Path(str_p)
     assert p.exists()
@@ -32,7 +42,7 @@ def s2_root():
 
 
 @pytest.fixture(scope="session")
-def hyspecnet_root():
+def hyspecnet_root() -> Path:
     str_p = os.environ.get("ENCODER_HYSPECNET_PATH") or "./tiffs/HySpecNet-11k/"
     p = Path(str_p)
     assert p.exists()
@@ -42,14 +52,12 @@ def hyspecnet_root():
 
 # https://docs.pytest.org/en/6.2.x/tmpdir.html#tmpdir-factory-example@pytest.fixture(scope="session")
 @pytest.fixture
-def encoded_bigearthnet_s1_s2_path(s1_root, s2_root, tmpdir_factory):
+def encoded_bigearthnet_s1_s2_path(s1_root, s2_root, tmpdir_factory) -> Path:
     tmp_path = tmpdir_factory.mktemp("lmdb")
-    executable = os.environ.get("ENCODER_EXEC_PATH")
-    assert executable, "Executable ENCODER_EXEC_PATH wasn't set. This should be setting by the code that executes pytest!"
     # This should make it easier to separately test different versions of the binary and the appimage as well
     subprocess.run(
         [
-            executable,
+            "rico-hdl",
             "bigearthnet",
             f"--bigearthnet-s1-dir={s1_root}",
             f"--bigearthnet-s2-dir={s2_root}",
@@ -57,35 +65,29 @@ def encoded_bigearthnet_s1_s2_path(s1_root, s2_root, tmpdir_factory):
         ],
         check=True,
     )
-    return tmp_path
+    return Path(tmp_path)
 
 
 @pytest.fixture
-def encoded_hyspecnet_path(hyspecnet_root, tmpdir_factory):
+def encoded_hyspecnet_path(hyspecnet_root, tmpdir_factory) -> Path:
     tmp_path = tmpdir_factory.mktemp("hyspec_lmdb")
-    executable = os.environ.get("ENCODER_EXEC_PATH")
-    assert executable, "Executable ENCODER_EXEC_PATH wasn't set. This should be setting by the code that executes pytest!"
     subprocess.run(
         [
-            executable,
+            "rico-hdl",
             "hyspecnet-11k",
             f"--dataset-dir={hyspecnet_root}",
             f"--target-dir={tmp_path}",
         ],
         check=True,
     )
-    return tmp_path
+    return Path(tmp_path)
 
 
 def test_python_bigearthnet_integration(
-    s1_root, s2_root, encoded_bigearthnet_s1_s2_path
+    s1_root, s2_root, encoded_bigearthnet_s1_s2_path, bigearthnet_lmdb_ref_path
 ):
-    s1_data = {
-        file: read_single_band_raster(file) for file in s1_root.glob("**/*.tif")
-    }
-    s2_data = {
-        file: read_single_band_raster(file) for file in s2_root.glob("**/*.tif")
-    }
+    s1_data = {file: read_single_band_raster(file) for file in s1_root.glob("**/*.tif")}
+    s2_data = {file: read_single_band_raster(file) for file in s2_root.glob("**/*.tif")}
     source_data = {**s1_data, **s2_data}
     env = lmdb.open(str(encoded_bigearthnet_s1_s2_path), readonly=True)
 
@@ -105,6 +107,17 @@ def test_python_bigearthnet_integration(
             np.array_equal(source_value, decoded_value)
             for decoded_value in decoded_values
         ), f"Couldn't find data in the LMDB database that matches the data from: {source_key}"
+
+    # LMDB consistency check
+    with encoded_bigearthnet_s1_s2_path.joinpath("data.mdb").open(mode="rb") as f:
+        encoded_hash = hashlib.file_digest(f, "sha256").hexdigest()
+
+    with bigearthnet_lmdb_ref_path.joinpath("data.mdb").open(mode="rb") as f:
+        reference_hash = hashlib.file_digest(f, "sha256").hexdigest()
+
+    assert (
+        encoded_hash == reference_hash
+    ), "The newly generated LMDB file has a different hash compared to the reference one!"
 
 
 def read_all_raster_bands(path):

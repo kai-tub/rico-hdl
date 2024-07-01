@@ -31,7 +31,7 @@ BIGEARTHNET_S2_ORDERING = [
     "B09",
 ]
 
-BIGEARTHNET_S1_ORDERING = ["VV", "VH"]
+BIGEARTHNET_S1_ORDERING = ["VH", "VV"]
 
 NUM_HYSPECNET_BANDS = 224
 
@@ -276,8 +276,8 @@ def bigearthnet_lmdb_key_extractor(path: str) -> bytes:
 
 
 def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
-    # there is no need to order the keys, as data will be ordered by LMDB
-    # lmdb_keys = natsorted(grouped.keys())
+    # insertion order is important for reproducibility!
+    paths.sort()
     log.debug("About to serialize data in chunks")
     # Keep the the individual processes around for as long as possible
     # to maximize efficiency
@@ -295,7 +295,9 @@ def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
                     executor.submit(safetensor_generator, path): path
                     for path in paths_chunk
                 }
-                for future in as_completed(futures_to_path):
+                # To ensure deterministic output, write in order
+                # i.e., cannot use `as_completed(futures_to_path)` !
+                for future in futures_to_path:
                     if not txn.put(
                         lmdb_key_extractor_func(futures_to_path[future]),
                         future.result(),

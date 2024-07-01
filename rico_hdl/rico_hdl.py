@@ -13,6 +13,7 @@ from more_itertools import chunked
 from tqdm import tqdm
 from concurrent.futures import as_completed, ProcessPoolExecutor
 import multiprocessing as mp
+import blosc2
 
 log = structlog.get_logger()
 
@@ -97,6 +98,12 @@ def s1_read_tif(path: Path):
             f"Could not find file: {path}\nThe S1 dataset is probably incomplete/broken!"
         )
     return read_single_band_raster(path)
+
+
+def zstd_compressor(data: bytes) -> bytes:
+    return blosc2.compress2(
+        data, codec=blosc2.Codec.ZSTD, clevel=9, filters=[blosc2.Filter.BITSHUFFLE]
+    )
 
 
 def safetensor_generator_s2(patch_path: str) -> bytes:
@@ -221,6 +228,7 @@ def bigearthnet(
     target_dir: TargetDir,
     bigearthnet_s1_dir: DatasetDir = None,
     bigearthnet_s2_dir: DatasetDir = None,
+    compress: bool = False,
 ):
     """
     BigEarthNet-S1 and BigEarthNet-S2 converter.
@@ -258,16 +266,27 @@ def bigearthnet(
     # Otherwise an error in the latter CLI argument could produce an incomplete LMDB
     env = open_lmdb(target_dir)
 
+    safetensor_gen_s1 = (
+        (lambda x: zstd_compressor(safetensor_generator_s1(x)))
+        if compress
+        else safetensor_generator_s1
+    )
+    safetensor_gen_s2 = (
+        (lambda x: zstd_compressor(safetensor_generator_s2(x)))
+        if compress
+        else safetensor_generator_s2
+    )
+
     if bigearthnet_s1_dir is not None:
         log.debug("Writing BigEarthNet-S1 data into LMDB")
         lmdb_writer(
-            env, s1_patch_paths, bigearthnet_lmdb_key_extractor, safetensor_generator_s1
+            env, s1_patch_paths, bigearthnet_lmdb_key_extractor, safetensor_gen_s1
         )
 
     if bigearthnet_s2_dir is not None:
         log.debug("Writing BigEarthNet-S2 data into LMDB")
         lmdb_writer(
-            env, s2_patch_paths, bigearthnet_lmdb_key_extractor, safetensor_generator_s2
+            env, s2_patch_paths, bigearthnet_lmdb_key_extractor, safetensor_gen_s2
         )
 
 

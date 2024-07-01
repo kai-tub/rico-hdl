@@ -20,7 +20,6 @@
     eachSystem = nixpkgs.lib.genAttrs (import systems);
     # pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
     pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}.extend devshell.overlays.default));
-    pythonTestDeps = ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest];
   in {
     formatter = eachSystem (system: pkgsFor.${system}.alejandra);
     checks = eachSystem (
@@ -109,8 +108,6 @@
         name = "rico-hdl-test-runner";
         runtimeInputs = [
           rico-hdl
-          (pkgs.python3.withPackages
-            pythonTestDeps)
         ];
         text = ''
           export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
@@ -142,7 +139,7 @@
             value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
           }
           {
-            name = "ENCODER_LMDB_REF_DATA_PATH";
+            name = "ENCODER_LMDB_REF_PATH";
             value = "./integration_tests/BigEarthNet_LMDB";
           }
           {

@@ -46,6 +46,7 @@ Currently, `rico-hdl` supports:
 - [BigEarthNet-S2 v2.0][ben]
 - [BigEarthNet-MM v2.0][ben]
 - [HySpecNet-11k][hyspecnet]
+- [UC Merced Land Use][ucmerced]
 
 Additional datasets will be added in the near future.
 
@@ -164,7 +165,8 @@ rico-hdl hyspecnet-11k --dataset-dir <HYSPECNET_ROOT_DIR> --dataset-dir Encoded-
 
 In [HySpecNet-11k][hyspecnet], each patch contains 224 bands.
 The encoder will convert each patch into a [safetensors][s]
-dictionary, where the band index prefixed with `B` is the key (for example, `B1`, `B201`).
+dictionary, where the band index prefixed with `B` is the key (for example, `B1`, `B201`)
+of the safetensor dictionary.
 
 <details>
   <summary>Example Input</summary>
@@ -265,6 +267,91 @@ tensor = np.stack([safetensor_dict[f"B{k}"] for k in hyspecnet_bands if k not in
 assert tensor.shape == (202, 128, 128)
 ```
 
+### [UC Merced Land Use][ucmerced] Example
+
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
+Then, to convert the patches from the [UC Merced Land Use][ucmerced]
+dataset into the optimized format, call the application with:
+
+```bash
+rico-hdl uc-merced --dataset-dir <UC_MERCED_LAND_USE_ROOT_DIR> --dataset-dir Encoded-UC-Merced
+```
+
+In [UC Merced][ucmerced], each patch contains 3 bands (RGB).
+The encoder will convert each patch into a [safetensors][s]
+dictionary, where the band's color interpretation is the key (one of `Red`, `Green`, `Blue`)
+of the safetensor dictionary.
+
+<details>
+  <summary>Example Input</summary>
+
+```
+integration_tests/tiffs/UCMerced_LandUse
+└── Images
+   ├── airplane
+   │  ├── airplane00.tif
+   │  └── airplane42.tif
+   └── forest
+      ├── forest10.tif
+      └── forest99.tif
+```
+</details>
+
+<details>
+  <summary>LMDB Result</summary>
+
+```
+'airplane00':
+  {
+    'Red':   <256x256 int16 safetensors image data>
+    'Green': <256x256 int16 safetensors image data>
+    'Blue':  <256x256 int16 safetensors image data>
+  },
+'airplane42':
+  {
+    'Red':   <256x256 int16 safetensors image data>
+    'Green': <256x256 int16 safetensors image data>
+    'Blue':  <256x256 int16 safetensors image data>
+  },
+'forest10':
+  {
+    'Red':   <256x256 int16 safetensors image data>
+    'Green': <256x256 int16 safetensors image data>
+    'Blue':  <256x256 int16 safetensors image data>
+  },
+'forest99':
+  {
+    'Red':   <256x256 int16 safetensors image data>
+    'Green': <256x256 int16 safetensors image data>
+    'Blue':  <256x256 int16 safetensors image data>
+  }
+```
+
+</details>
+
+```python
+import lmdb
+import numpy as np
+# import desired deep-learning library:
+# numpy, torch, tensorflow, paddle, flax, mlx
+from safetensors.numpy import load
+from pathlib import Path
+
+encoded_path = "Encoded-UC-Merced"
+
+# Make sure to only open the environment once
+# and not everytime an item is accessed.
+env = lmdb.open(str(encoded_path), readonly=True)
+
+with env.begin() as txn:
+  # string encoding is required to map the string to an LMDB key
+  safetensor_dict = load(txn.get("airplane00".encode()))
+
+tensor = np.stack([safetensor_dict[key] for key in ["Red", "Green", "Blue"]])
+assert tensor.shape == (3, 256, 256)
+```
+
 
 ## Design
 
@@ -311,3 +398,4 @@ These characteristics make array-structured data formats less suitable for deep-
 [hyspecnet]: https://hyspecnet.rsim.berlin/
 [pyl]: https://lmdb.readthedocs.io/en/release/
 [pys]: https://github.com/huggingface/safetensors
+[ucmerced]: http://weegee.vision.ucmerced.edu/datasets/landuse.html

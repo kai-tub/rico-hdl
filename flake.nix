@@ -113,10 +113,11 @@
             pythonTestDeps)
         ];
         text = ''
-          export ENCODER_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
-          export ENCODER_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
-          export ENCODER_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
-          export ENCODER_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
+          export RICO_HDL_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
+          export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
+          export RICO_HDL_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
+          export RICO_HDL_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
+          export RICO_HDL_UC_MERCED_PATH=${./integration_tests/BigEarthNet_LMDB}
           echo "Running Python integration tests."
           pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
@@ -129,30 +130,29 @@
     in {
       default = pkgs.devshell.mkShell {
         env = [
-          # {
-          #   name = "PYTHONPATH";
-          #   prefix = "${pkgs.python3Packages.ipykernel}/${pkgs.python3.sitePackages}";
-          # }
           {
-            name = "ENCODER_HYSPECNET_PATH";
-            value = "./integration_tests/tiffs/HySpecNet-11k/";
+            name = "RICO_HDL_HYSPECNET_PATH";
+            eval = "$PRJ_ROOT/integration_tests/tiffs/HySpecNet-11k/";
           }
           {
-            name = "ENCODER_S1_PATH";
-            value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
+            name = "RICO_HDL_UC_MERCED_PATH";
+            eval = "$PRJ_ROOT/integration_tests/tiffs/UCMerced_LandUse/";
           }
           {
-            name = "ENCODER_LMDB_REF_DATA_PATH";
-            value = "./integration_tests/BigEarthNet_LMDB";
+            name = "RICO_HDL_S1_PATH";
+            eval = "$PRJ_ROOT/integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
           }
           {
-            # seems to be some permission issues with walkdir
-            # if I use ${./tiffs/...}
-            # The permission all look good under the nix store
-            # and copying from the directory to the local directory
-            # also works
-            name = "ENCODER_S2_PATH";
-            value = "./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
+            name = "RICO_HDL_LMDB_REF_DATA_PATH";
+            eval = "$PRJ_ROOT/integration_tests/BigEarthNet_LMDB";
+          }
+          {
+            name = "RICO_HDL_S2_PATH";
+            eval = "$PRJ_ROOT/integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
+          }
+          {
+            name = "RICO_HDL_LMDB_REF_PATH";
+            eval = "$PRJ_ROOT/integration_tests/BigEarthNet_LMDB";
           }
           {
             name = "JUPYTER_PATH";

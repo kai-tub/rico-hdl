@@ -117,7 +117,8 @@
           export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
           export RICO_HDL_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
           export RICO_HDL_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
-          export RICO_HDL_UC_MERCED_PATH=${./integration_tests/BigEarthNet_LMDB}
+          export RICO_HDL_UC_MERCED_PATH=${./integration_tests/UCMerced_LandUse}
+          export RICO_HDL_EUROSAT_MS_PATH=${./integration_tests/tiffs/EuroSAT_MS}
           echo "Running Python integration tests."
           pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
@@ -137,6 +138,10 @@
           {
             name = "RICO_HDL_UC_MERCED_PATH";
             eval = "$PRJ_ROOT/integration_tests/tiffs/UCMerced_LandUse/";
+          }
+          {
+            name = "RICO_HDL_EUROSAT_MS_PATH";
+            eval = "$PRJ_ROOT/integration_tests/tiffs/EuroSAT_MS";
           }
           {
             name = "RICO_HDL_S1_PATH";
@@ -165,6 +170,9 @@
             {
               projectDir = ./.;
               preferWheels = true;
+              editablePackageSources = {
+                rico-hdl = ./src;
+              };
             })
           pkgs.poetry
         ];

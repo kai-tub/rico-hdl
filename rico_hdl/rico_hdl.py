@@ -33,6 +33,28 @@ BIGEARTHNET_S2_ORDERING = [
     "B09",
 ]
 
+# Defined in the order of the bands!
+# Order taken from (and only implicitely confirmed in):
+# https://github.com/phelber/EuroSAT/issues/7#issuecomment-916754970
+# Visualizing the individual bands supports the ordering, as one
+# can see the different interpolation strengths for the 20 and 60m
+# bands.
+EUROSAT_MS_BANDS = [
+    "B01",
+    "B02",
+    "B03",
+    "B04",
+    "B05",
+    "B06",
+    "B07",
+    "B08",
+    "B09",
+    "B10",
+    "B11",
+    "B12",
+    "B08A",
+]
+
 BIGEARTHNET_S1_ORDERING = ["VH", "VV"]
 
 NUM_HYSPECNET_BANDS = 224
@@ -147,7 +169,7 @@ def uc_merced(
     dataset_dir: DatasetDir,
 ):
     """
-    UC Merced Land Use Dataset converter.
+    [UC Merced Land Use Dataset](http://weegee.vision.ucmerced.edu/datasets/landuse.html) converter.
 
     The LMDB keys will be the names of the UC Merced patches without the
     `.tif` suffix.
@@ -171,6 +193,40 @@ def uc_merced(
     env = open_lmdb(target_dir)
     log.debug("Writing UC Merced data into LMDB")
     lmdb_writer(env, patch_paths, encode_stem, uc_merced_to_safetensor)
+
+
+@app.command()
+def eurosat_multi_spectral(
+    target_dir: TargetDir,
+    dataset_dir: DatasetDir,
+    # RGB ?
+):
+    """
+    [EuroSAT Multi-Spectral](https://doi.org/10.5281/zenodo.7711810) converter.
+
+    The LMDB keys will be the names of the EuroSAT_MS patches without the
+    `.tif` suffix.
+
+    The `safetensor` keys are the band names from the
+    [EuroSAT paper](https://ieeexplore.ieee.org/abstract/document/8736785).
+
+    NOTE: No atmospheric correction has been applied to the dataset
+    NOTE: Lower spatial resolution bands were upsampled to 10m spatial resolution
+    using cubic-spline interpolation.
+    """
+    log.info(f"Searching for patches in: {dataset_dir}")
+    # this could match the file paths directly
+    # the lmdb key would be the name itself without SPECTRAL_IMAGE.TIF
+    # and the safetensor would be produced from this file
+    # Remember: hyspecnet has multiple bands per file!
+    patch_paths = fast_find(r".*\d+\.tif$", dataset_dir, only_dir=False)
+    num_patch_paths = len(patch_paths)
+    log.debug(f"Found {num_patch_paths} patches.")
+    assert num_patch_paths > 0
+    env = open_lmdb(target_dir)
+    log.debug("Writing EuroSAT_MS data into LMDB")
+    # Understand what the Band mapping is!
+    lmdb_writer(env, patch_paths, encode_stem, eurosat_ms_to_safetensor)
 
 
 @app.command()
@@ -207,6 +263,23 @@ def encode_stem(path: str) -> bytes:
     Given a path extract the stem and encode the string.
     """
     return str(Path(path).stem).encode()
+
+
+def eurosat_ms_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a multi-spectral EuroSAT patch file (`.tif` file),
+    read the individual bands and write them as entries
+    into a serialized safetensor dictionary.
+    The keys map to the band name specified in the [EuroSAT paper](https://ieeexplore.ieee.org/abstract/document/8736785)
+    (one of: `B01`, `B02`, `B03`, `B04`, `B05`, `B06`, `B07`, `B08`, `B08A`, `B09`, `B10`, `B11`, `B12`)
+    """
+    p = Path(patch_path)
+    data = {
+        name: read_single_band_raster(p, index=idx)
+        for idx, name in enumerate(EUROSAT_MS_BANDS, start=1)
+    }
+
+    return save(data, metadata=None)
 
 
 def uc_merced_to_safetensor(patch_path: str) -> bytes:
@@ -254,6 +327,8 @@ def fast_find(
     """
     Use `fd` to quickly find all files/directories that match a given regular expression.
     Will default to using `os.cpu_count()` number of threads.
+    This highly optimized program is especially useful for slow network-attached storage solutions
+    or slow hard-drives.
     """
     return subprocess.check_output(
         [
@@ -278,7 +353,7 @@ def bigearthnet(
     bigearthnet_s2_dir: DatasetDir = None,
 ):
     """
-    BigEarthNet-S1 and BigEarthNet-S2 converter.
+    [BigEarthNet-S1 and BigEarthNet-S2](https://doi.org/10.5281/zenodo.10891137) converter.
     If both source directories are given, both of them will be written to the same LMDB file.
 
     The LMDB keys will be the names of the BigEarthNet-S1/S2 patches (i.e., no `_BXY.tif` suffix).
@@ -323,6 +398,16 @@ def bigearthnet(
 
 
 def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
+    """
+    A parallel LMDB writer.
+    It takes an already opened LMDB `env` as an input and writes batched
+    transactions to the DB.
+    It will iterate in parallel over the paths and will call the
+    `lmdb_key_extractor_func` and `safetensor_generator` on each provided `path`.
+    The data is inserted in a sorted order to ensure stable and repeatable outputs.
+    The function will NOT overwrite any data! If data would be overwritten, the program
+    halts and exists the program with an error message.
+    """
     # insertion order is important for reproducibility!
     paths.sort()
     log.debug("About to serialize data in chunks")

@@ -47,6 +47,7 @@ Currently, `rico-hdl` supports:
 - [BigEarthNet-MM v2.0][ben]
 - [HySpecNet-11k][hyspecnet]
 - [UC Merced Land Use][ucmerced]
+- [EuroSAT][euro]
 
 Additional datasets will be added in the near future.
 
@@ -304,27 +305,27 @@ integration_tests/tiffs/UCMerced_LandUse
 ```
 'airplane00':
   {
-    'Red':   <256x256 int16 safetensors image data>
-    'Green': <256x256 int16 safetensors image data>
-    'Blue':  <256x256 int16 safetensors image data>
+    'Red':   <256x256 uint8 safetensors image data>
+    'Green': <256x256 uint8 safetensors image data>
+    'Blue':  <256x256 uint8 safetensors image data>
   },
 'airplane42':
   {
-    'Red':   <256x256 int16 safetensors image data>
-    'Green': <256x256 int16 safetensors image data>
-    'Blue':  <256x256 int16 safetensors image data>
+    'Red':   <256x256 uint8 safetensors image data>
+    'Green': <256x256 uint8 safetensors image data>
+    'Blue':  <256x256 uint8 safetensors image data>
   },
 'forest10':
   {
-    'Red':   <256x256 int16 safetensors image data>
-    'Green': <256x256 int16 safetensors image data>
-    'Blue':  <256x256 int16 safetensors image data>
+    'Red':   <256x256 uint8 safetensors image data>
+    'Green': <256x256 uint8 safetensors image data>
+    'Blue':  <256x256 uint8 safetensors image data>
   },
 'forest99':
   {
-    'Red':   <256x256 int16 safetensors image data>
-    'Green': <256x256 int16 safetensors image data>
-    'Blue':  <256x256 int16 safetensors image data>
+    'Red':   <256x256 uint8 safetensors image data>
+    'Green': <256x256 uint8 safetensors image data>
+    'Blue':  <256x256 uint8 safetensors image data>
   }
 ```
 
@@ -350,6 +351,96 @@ with env.begin() as txn:
 
 tensor = np.stack([safetensor_dict[key] for key in ["Red", "Green", "Blue"]])
 assert tensor.shape == (3, 256, 256)
+```
+
+### [EuroSAT][euro] Example
+
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
+Then, to convert the patches from the [EuroSAT][euro] multi-spectral
+dataset into the optimized format, call the application with:
+
+```bash
+rico-hdl eurosat-multi-spectral --dataset-dir <EURO_SAT_MS_ROOT_DIR> --dataset-dir Encoded-EuroSAT-MS
+```
+
+In [EuroSAT][euro], each patch contains 13 bands from a Sentinel-2 L1C tile.
+The encoder will convert each patch into a [safetensors][s]
+where the dictionary's key is the band name (`B01`, `B02`,..., `B10`, `B11`, `B12`, `B8A`)
+of the safetensor dictionary.
+
+<details>
+  <summary>Example Input</summary>
+
+```
+integration_tests/tiffs/EuroSAT_MS
+├── AnnualCrop
+│  └── AnnualCrop_1.tif
+├── Pasture
+│  └── Pasture_300.tif
+└── SeaLake
+   └── SeaLake_3000.tif
+```
+</details>
+
+<details>
+  <summary>LMDB Result</summary>
+
+```
+'AnnualCrop_1':
+  {
+    'B01':   <64x64 uint16 safetensors image data>,
+    'B02':   <64x64 uint16 safetensors image data>,
+    'B03':   <64x64 uint16 safetensors image data>,
+    'B04':   <64x64 uint16 safetensors image data>,
+    'B05':   <64x64 uint16 safetensors image data>,
+    'B06':   <64x64 uint16 safetensors image data>,
+    'B07':   <64x64 uint16 safetensors image data>,
+    'B08':   <64x64 uint16 safetensors image data>,
+    'B09':   <64x64 uint16 safetensors image data>,
+    'B10':   <64x64 uint16 safetensors image data>,
+    'B11':   <64x64 uint16 safetensors image data>,
+    'B12':   <64x64 uint16 safetensors image data>,
+    'B08A':  <64x64 uint16 safetensors image data>,
+  },
+```
+
+</details>
+
+```python
+import lmdb
+import numpy as np
+# import desired deep-learning library:
+# numpy, torch, tensorflow, paddle, flax, mlx
+from safetensors.numpy import load
+from pathlib import Path
+
+encoded_path = "Encoded-EuroSAT-MS"
+
+# Make sure to only open the environment once
+# and not everytime an item is accessed.
+env = lmdb.open(str(encoded_path), readonly=True)
+
+with env.begin() as txn:
+  # string encoding is required to map the string to an LMDB key
+  safetensor_dict = load(txn.get("AnnualCrop_1".encode()))
+
+tensor = np.stack([safetensor_dict[key] for key in [
+  "B01",
+  "B02",
+  "B03",
+  "B04",
+  "B05",
+  "B06",
+  "B07",
+  "B08",
+  "B09",
+  "B10",
+  "B11",
+  "B12",
+  "B08A"
+]])
+assert tensor.shape == (13, 64, 64)
 ```
 
 
@@ -399,3 +490,4 @@ These characteristics make array-structured data formats less suitable for deep-
 [pyl]: https://lmdb.readthedocs.io/en/release/
 [pys]: https://github.com/huggingface/safetensors
 [ucmerced]: http://weegee.vision.ucmerced.edu/datasets/landuse.html
+[euro]: https://zenodo.org/records/7711810

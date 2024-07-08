@@ -2,7 +2,7 @@
 
 > A fast and easy-to-use **r**emote sensing **i**mage format **co**nverter for **h**igh-throughput **d**eep-**l**earning (rico-hdl).
 
-<img alt="Powered by nix" src="https://img.shields.io/badge/Powered%20By-Nix-blue?style=flat&logo=snowflake"> <img alt="Static Badge" src="https://img.shields.io/badge/AppImage-Available-blue?style=flat&logo=files">
+<img alt="Powered by nix" src="https://img.shields.io/badge/Powered%20By-Nix-blue?style=flat&logo=snowflake"> <a href="https://arxiv.org/abs/2407.03653"><img src="https://img.shields.io/badge/arXiv-2407.03653-b31b1b.svg" alt="arxiv link"></a> <img alt="Static Badge" src="https://img.shields.io/badge/AppImage-Available-blue?style=flat&logo=files">
 <img alt="Static Badge Docker" src="https://img.shields.io/badge/Docker-Available-blue?style=flat&logo=docker&link=ghcr.io%2Fkai-tub%2Frico-hdl">
 <img alt="Static Badge MIT License" src="https://img.shields.io/badge/License-MIT-blue?style=flat&link=https%3A%2F%2Fopensource.org%2Flicenses%2Fmit-0">
 <img alt="Tests Status Badge" src="https://github.com/kai-tub/rico-hdl/actions/workflows/nix.yml/badge.svg">

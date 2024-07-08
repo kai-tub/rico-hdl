@@ -27,10 +27,7 @@
   in {
     formatter = eachSystem (system: pkgsFor.${system}.alejandra);
     checks = eachSystem (
-      system: let
-        pkgs = pkgsFor.${system};
-        lib = pkgs.lib;
-      in
+      system:
         {
           pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
             src = ./.;
@@ -39,12 +36,6 @@
               trim-trailing-whitespace.enable = true;
             };
           };
-          rico-hdl-test-runner-check =
-            pkgs.runCommandNoCC "rs-encoder-test-runner-check" {
-              nativeBuildInputs = [self.packages.${system}.rico-hdl-test-runner];
-            } ''
-              ${lib.getExe self.packages.${system}.rico-hdl-test-runner} && touch $out
-            '';
         }
         // self.packages.${system}
     );
@@ -68,6 +59,16 @@
             --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.fd]}
         '';
         meta.mainProgram = "rico-hdl";
+        checkPhase = ''
+          export PATH="$out/bin:$PATH"
+          export RICO_HDL_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
+          export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
+          export RICO_HDL_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
+          export RICO_HDL_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
+          export RICO_HDL_UC_MERCED_PATH=${./integration_tests/tiffs/UCMerced_LandUse}
+          export RICO_HDL_EUROSAT_MS_PATH=${./integration_tests/tiffs/EuroSAT_MS}
+          pytest
+        '';
         # Python312 breaks LMDB...
         # python = pkgs.python312;
         # no idea how to write this:
@@ -105,25 +106,6 @@
           nix build .#rico-hdl-docker
           DOCKER_REPOSITORY="docker://ghcr.io/kai-tub/rico-hdl"
           skopeo --insecure-policy copy "docker-archive:result" "$DOCKER_REPOSITORY"
-        '';
-      };
-
-      rico-hdl-test-runner = pkgs.writeShellApplication {
-        name = "rico-hdl-test-runner";
-        runtimeInputs = [
-          rico-hdl
-          (pkgs.python3.withPackages
-            pythonTestDeps)
-        ];
-        text = ''
-          export RICO_HDL_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
-          export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
-          export RICO_HDL_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
-          export RICO_HDL_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
-          export RICO_HDL_UC_MERCED_PATH=${./integration_tests/UCMerced_LandUse}
-          export RICO_HDL_EUROSAT_MS_PATH=${./integration_tests/tiffs/EuroSAT_MS}
-          echo "Running Python integration tests."
-          pytest ${./integration_tests/test_python_integration.py} && echo "Success!"
         '';
       };
     });

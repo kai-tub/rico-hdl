@@ -482,6 +482,21 @@ These characteristics make array-structured data formats less suitable for deep-
 
 </details>
 
+## Citation
+
+If you use this work, please cite:
+
+```bibtex
+@article{clasen2024refinedbigearthnet,
+  title={reBEN: Refined BigEarthNet Dataset for Remote Sensing Image Analysis},
+  author={Clasen, Kai Norman and Hackel, Leonard and Burgert, Tom and Sumbul, Gencer and Demir, Beg{\"u}m and Markl, Volker},
+  year={2024},
+  eprint={2407.03653},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/2407.03653},
+}
+```
 
 [ben]: https://bigearth.net
 [LMDB]: https://www.symas.com/lmdb

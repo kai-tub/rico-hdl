@@ -19,7 +19,9 @@ jobs:
       - name: Run `nix fmt`
         run: nix fmt -- --check *
       - name: Run `flake checks`
-        run: nix flake check -L
+        # impure is required as the devshell is tested as well
+        # and the devenv devshell requires the `impure` flag
+        run: nix flake check --impure -L
       - name: Create AppImage
         run: nix build .#rico-hdl-AppImage
       - name: Test appimage

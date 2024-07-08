@@ -15,7 +15,7 @@ The encoder converts the remote sensing images into a DL-optimized format.
 The resulting output will provide significantly higher throughput than the original
 remote sensing images (patches)
 and should be used instead of the unprocessed dataset.
-The data is encoded in a DL-library independent format, ensuring flexible use.
+The data is encoded in a DL-framework independent format, ensuring flexible use.
 Concretely, the image files are converted into the [safetensors][s] format and stored inside the
 [LMDB][LMDB] key-value database.
 
@@ -366,7 +366,7 @@ rico-hdl eurosat-multi-spectral --dataset-dir <EURO_SAT_MS_ROOT_DIR> --dataset-d
 
 In [EuroSAT][euro], each patch contains 13 bands from a Sentinel-2 L1C tile.
 The encoder will convert each patch into a [safetensors][s]
-where the dictionary's key is the band name (`B01`, `B02`,..., `B10`, `B11`, `B12`, `B8A`)
+where the dictionary's key is the band name (`B01`, `B02`,..., `B10`, `B11`, `B12`, `B08A`)
 of the safetensor dictionary.
 
 <details>
@@ -403,6 +403,38 @@ integration_tests/tiffs/EuroSAT_MS
     'B12':   <64x64 uint16 safetensors image data>,
     'B08A':  <64x64 uint16 safetensors image data>,
   },
+'Pasture_300':
+  {
+    'B01':   <64x64 uint16 safetensors image data>,
+    'B02':   <64x64 uint16 safetensors image data>,
+    'B03':   <64x64 uint16 safetensors image data>,
+    'B04':   <64x64 uint16 safetensors image data>,
+    'B05':   <64x64 uint16 safetensors image data>,
+    'B06':   <64x64 uint16 safetensors image data>,
+    'B07':   <64x64 uint16 safetensors image data>,
+    'B08':   <64x64 uint16 safetensors image data>,
+    'B09':   <64x64 uint16 safetensors image data>,
+    'B10':   <64x64 uint16 safetensors image data>,
+    'B11':   <64x64 uint16 safetensors image data>,
+    'B12':   <64x64 uint16 safetensors image data>,
+    'B08A':  <64x64 uint16 safetensors image data>,
+  },
+'SeaLake_3000':
+  {
+    'B01':   <64x64 uint16 safetensors image data>,
+    'B02':   <64x64 uint16 safetensors image data>,
+    'B03':   <64x64 uint16 safetensors image data>,
+    'B04':   <64x64 uint16 safetensors image data>,
+    'B05':   <64x64 uint16 safetensors image data>,
+    'B06':   <64x64 uint16 safetensors image data>,
+    'B07':   <64x64 uint16 safetensors image data>,
+    'B08':   <64x64 uint16 safetensors image data>,
+    'B09':   <64x64 uint16 safetensors image data>,
+    'B10':   <64x64 uint16 safetensors image data>,
+    'B11':   <64x64 uint16 safetensors image data>,
+    'B12':   <64x64 uint16 safetensors image data>,
+    'B08A':  <64x64 uint16 safetensors image data>,
+  }
 ```
 
 </details>

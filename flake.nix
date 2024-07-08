@@ -3,7 +3,11 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     systems.url = "github:nix-systems/x86_64-linux";
     nix-filter.url = "github:numtide/nix-filter";
-    devshell.url = "github:numtide/devshell";
+    devenv = {
+      url = "github:cachix/devenv";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
     nix-appimage = {
       url = "github:ralismark/nix-appimage";
@@ -14,12 +18,11 @@
     self,
     nixpkgs,
     systems,
-    devshell,
     ...
   } @ inputs: let
     eachSystem = nixpkgs.lib.genAttrs (import systems);
     # pkgsFor = eachSystem (system: ((nixpkgs.legacyPackages.${system}.extend devshell.overlays.default).extend self.overlays.default));
-    pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}.extend devshell.overlays.default));
+    pkgsFor = eachSystem (system: (nixpkgs.legacyPackages.${system}));
     pythonTestDeps = ps: with ps; [numpy lmdb rasterio safetensors more-itertools pytest];
   in {
     formatter = eachSystem (system: pkgsFor.${system}.alejandra);
@@ -127,54 +130,41 @@
 
     devShells = eachSystem (system: let
       pkgs = pkgsFor.${system};
+      lib = pkgs.lib;
       inherit (inputs.poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryEnv;
     in {
-      default = pkgs.devshell.mkShell {
-        env = [
-          {
-            name = "RICO_HDL_HYSPECNET_PATH";
-            eval = "$PRJ_ROOT/integration_tests/tiffs/HySpecNet-11k/";
-          }
-          {
-            name = "RICO_HDL_UC_MERCED_PATH";
-            eval = "$PRJ_ROOT/integration_tests/tiffs/UCMerced_LandUse/";
-          }
-          {
-            name = "RICO_HDL_EUROSAT_MS_PATH";
-            eval = "$PRJ_ROOT/integration_tests/tiffs/EuroSAT_MS";
-          }
-          {
-            name = "RICO_HDL_S1_PATH";
-            eval = "$PRJ_ROOT/integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
-          }
-          {
-            name = "RICO_HDL_LMDB_REF_DATA_PATH";
-            eval = "$PRJ_ROOT/integration_tests/BigEarthNet_LMDB";
-          }
-          {
-            name = "RICO_HDL_S2_PATH";
-            eval = "$PRJ_ROOT/integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
-          }
-          {
-            name = "RICO_HDL_LMDB_REF_PATH";
-            eval = "$PRJ_ROOT/integration_tests/BigEarthNet_LMDB";
-          }
-          {
-            name = "JUPYTER_PATH";
-            # should be the python from poetry
-            value = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
-          }
-        ];
-        packages = [
-          (mkPoetryEnv
-            {
-              projectDir = ./.;
-              preferWheels = true;
-              editablePackageSources = {
-                rico-hdl = ./src;
-              };
-            })
-          pkgs.poetry
+      default = inputs.devenv.lib.mkShell {
+        inherit pkgs inputs;
+        modules = [
+          ({
+            pkgs,
+            config,
+            ...
+          }: {
+            enterShell = self.checks.${system}.pre-commit-check.shellHook;
+            env.RICO_HDL_HYSPECNET_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/HySpecNet-11k/";
+            env.RICO_HDL_UC_MERCED_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/UCMerced_LandUse/";
+            env.RICO_HDL_EUROSAT_MS_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/EuroSAT_MS";
+            env.RICO_HDL_S1_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
+            env.RICO_HDL_LMDB_REF_DATA_PATH = "${config.env.DEVENV_ROOT}/integration_tests/BigEarthNet_LMDB";
+            env.RICO_HDL_S2_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
+            env.RICO_HDL_LMDB_REF_PATH = "${config.env.DEVENV_ROOT}/integration_tests/BigEarthNet_LMDB";
+            env.JUPYTER_PATH = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
+            packages =
+              [
+                (mkPoetryEnv
+                  {
+                    projectDir = ./.;
+                    preferWheels = true;
+                    editablePackageSources = {
+                      rico-hdl = ./src;
+                    };
+                  })
+                pkgs.poetry
+                pkgs.quarto
+              ]
+              ++ self.checks.${system}.pre-commit-check.enabledPackages;
+          })
         ];
       };
     });

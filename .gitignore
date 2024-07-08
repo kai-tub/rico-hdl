@@ -1,6 +1,7 @@
 /target
 .direnv
 .ipynb_checkpoints
+.devenv
 /result
 .virtual_documents/integration_tests
 *.AppImage

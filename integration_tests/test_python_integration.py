@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 import subprocess
 import hashlib
-from rico_hdl.rico_hdl import EUROSAT_MS_BANDS
 
 
 def read_single_band_raster(path):
@@ -138,7 +137,7 @@ def encoded_eurosat_ms_path(eurosat_ms_root, tmpdir_factory) -> Path:
     return Path(tmp_path)
 
 
-def test_bigearthnet_integration(
+def test_reproducibility_and_data_consistency(
     s1_root, s2_root, encoded_bigearthnet_s1_s2_path, bigearthnet_lmdb_ref_path
 ):
     s1_data = {file: read_single_band_raster(file) for file in s1_root.glob("**/*.tif")}
@@ -175,123 +174,163 @@ def test_bigearthnet_integration(
     ), "The newly generated LMDB file has a different hash compared to the reference one!"
 
 
-def read_all_hyspecnet_bands(path):
-    """
-    Given a path to a GeoTIFF return all bands as a dictionary,
-    where the key is the unformatted band index (starting from 1)
-    as a string and the value the array data
-    """
-    with rasterio.open(path) as r:
-        return {f"B{i}": r.read(i) for i in range(1, r.count + 1)}
+def test_bigearthnet_integration(
+    s1_root, s2_root, encoded_bigearthnet_s1_s2_path, bigearthnet_lmdb_ref_path
+):
+    env = lmdb.open(str(encoded_bigearthnet_s1_s2_path), readonly=True)
+
+    with env.begin(write=False) as txn:
+        cur = txn.cursor()
+        decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
+
+    assert decoded_lmdb_data.keys() == set(
+        [
+            "S1A_IW_GRDH_1SDV_20170613T165043_33UUP_70_48",
+            "S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43",
+        ]
+    )
+
+    sample_s1_safetensors_dict = decoded_lmdb_data.get(
+        "S1A_IW_GRDH_1SDV_20170613T165043_33UUP_70_48"
+    )
+    sample_s2_safetensors_dict = decoded_lmdb_data.get(
+        "S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43"
+    )
+    safetensors_s1_keys = sample_s1_safetensors_dict.keys()
+    safetensors_s2_keys = sample_s2_safetensors_dict.keys()
+    assert (
+        set(
+            [
+                "B01",
+                "B02",
+                "B03",
+                "B04",
+                "B05",
+                "B06",
+                "B07",
+                "B08",
+                "B8A",
+                "B09",
+                "B11",
+                "B12",
+            ]
+        )
+        == safetensors_s2_keys
+    )
+    assert (
+        set(
+            [
+                "VV",
+                "VH",
+            ]
+        )
+        == safetensors_s1_keys
+    )
+
+    assert all(arr.shape == (120, 120) for arr in sample_s1_safetensors_dict.values())
+    assert all(arr.dtype == "float32" for arr in sample_s1_safetensors_dict.values())
+
+    assert all(arr.dtype == "uint16" for arr in sample_s2_safetensors_dict.values())
+    assert all(
+        sample_s2_safetensors_dict[key].shape == (120, 120)
+        for key in ["B02", "B03", "B04", "B08"]
+    )
+    assert all(
+        sample_s2_safetensors_dict[key].shape == (60, 60)
+        for key in ["B05", "B06", "B07", "B8A", "B11", "B12"]
+    )
+    assert all(
+        sample_s2_safetensors_dict[key].shape == (20, 20) for key in ["B01", "B09"]
+    )
 
 
 def test_hyspecnet_integration(hyspecnet_root, encoded_hyspecnet_path):
-    source_file_data = {
-        file: read_all_hyspecnet_bands(file)
-        for file in hyspecnet_root.glob("**/*SPECTRAL_IMAGE.TIF")
-    }
-    assert len(source_file_data) > 0
-
-    # code to create the directory
-    # ./result/bin/encoder --hyspecnet-11k <PATH> hyspec_artifacts/
     env = lmdb.open(str(encoded_hyspecnet_path), readonly=True)
 
     with env.begin(write=False) as txn:
         cur = txn.cursor()
         decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
 
-    # The encoded data is nested inside of another safetensor dictionary,
-    # where the inner keys are derived from the band number as a string
-    decoded_dicts = [d for d in decoded_lmdb_data.values()]
+    lmdb_keys = decoded_lmdb_data.keys()
 
-    # Simply check if the data remains identical, as this is the only _true_ thing I care about from the Python viewpoint
-    # Here I iterate over all file name and raster data as dictionaries pairs
-    # and then for each raster data dictionary iterate over all key-value pairs, where the key is the band name
-    # in the same style as the LMDB file and check if the LMDB file contained a matching array from
-    # a safetensors dictionary accessed via the shared band name as key.
-    for source_file, source_data_dict in source_file_data.items():
-        for source_key, source_data in source_data_dict.items():
-            assert any(
-                np.array_equal(source_data, decoded_dict[source_key])
-                for decoded_dict in decoded_dicts
-            ), f"Couldn't find data in the LMDB database that matches the data from: {source_file}:{source_key}"
+    # only have two samples
+    assert len(lmdb_keys) == 2
 
+    assert (
+        "ENMAP01-____L2A-DT0000004950_20221103T162438Z_001_V010110_20221118T145147Z-Y01460273_X03110438"
+        in lmdb_keys
+    )
+    assert (
+        "ENMAP01-____L2A-DT0000004950_20221103T162438Z_001_V010110_20221118T145147Z-Y01460273_X04390566"
+        in lmdb_keys
+    )
 
-def read_all_uc_merced_bands(path):
-    """
-    Given a path to a UC Merced TIFF file return all bands as a dictionary,
-    where the keys are the color value
-    """
-    with rasterio.open(path) as r:
-        return {key: r.read(i) for i, key in enumerate(["Red", "Green", "Blue"], 1)}
+    sample_safetensors_dict = decoded_lmdb_data.get(
+        "ENMAP01-____L2A-DT0000004950_20221103T162438Z_001_V010110_20221118T145147Z-Y01460273_X03110438"
+    )
+    safetensors_keys = sample_safetensors_dict.keys()
+    assert "B1" in safetensors_keys
+    assert "B100" in safetensors_keys
+    assert "B224" in safetensors_keys
+
+    assert "B0" not in safetensors_keys
+    assert "B01" not in safetensors_keys
+    assert "B225" not in safetensors_keys
+
+    assert all(arr.shape == (128, 128) for arr in sample_safetensors_dict.values())
+    assert all(arr.dtype == "int16" for arr in sample_safetensors_dict.values())
 
 
 @pytest.mark.filterwarnings("ignore:Dataset has no geotransform")
 def test_uc_merced_integration(uc_merced_root, encoded_uc_merced_path):
-    source_file_data = {
-        file: read_all_uc_merced_bands(file) for file in uc_merced_root.glob("**/*.tif")
-    }
-    assert len(source_file_data) > 0
-
-    # code to create the directory
-    # ./result/bin/encoder --hyspecnet-11k <PATH> hyspec_artifacts/
     env = lmdb.open(str(encoded_uc_merced_path), readonly=True)
 
     with env.begin(write=False) as txn:
         cur = txn.cursor()
         decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
 
-    # The encoded data is nested inside of another safetensor dictionary,
-    # where the inner keys are derived from color mapping
-    decoded_dicts = [d for d in decoded_lmdb_data.values()]
+    lmdb_keys = decoded_lmdb_data.keys()
+    assert lmdb_keys == set(["airplane00", "airplane42", "forest10", "forest99"])
 
-    # Simply check if the data remains identical, as this is the only _true_ thing I care about from the Python viewpoint
-    # Here I iterate over all file name and raster data as dictionaries pairs
-    # and then for each raster data dictionary iterate over all key-value pairs, where the key is the band name
-    # in the same style as the LMDB file and check if the LMDB file contained a matching array from
-    # a safetensors dictionary accessed via the shared band name as key.
-    for source_file, source_data_dict in source_file_data.items():
-        for source_key, source_data in source_data_dict.items():
-            assert any(
-                np.array_equal(source_data, decoded_dict[source_key])
-                for decoded_dict in decoded_dicts
-            ), f"Couldn't find data in the LMDB database that matches the data from: {source_file}:{source_key}"
+    sample_safetensors_dict = decoded_lmdb_data.get("airplane00")
+    safetensors_keys = sample_safetensors_dict.keys()
+    assert set(["Red", "Green", "Blue"]) == safetensors_keys
 
-
-def read_all_eurosat_ms_bands(path):
-    """
-    Given a path to a TIFF file return all bands as a dictionary,
-    where the keys are the EuroSAT MS band value
-    """
-    with rasterio.open(path) as r:
-        return {key: r.read(i) for i, key in enumerate(EUROSAT_MS_BANDS, start=1)}
+    assert all(arr.shape == (256, 256) for arr in sample_safetensors_dict.values())
+    assert all(arr.dtype == "uint8" for arr in sample_safetensors_dict.values())
 
 
 def test_eurosat_integration(eurosat_ms_root, encoded_eurosat_ms_path):
-    source_file_data = {
-        file: read_all_eurosat_ms_bands(file)
-        for file in eurosat_ms_root.glob("**/*.tif")
-    }
-    assert len(source_file_data) > 0
-
     env = lmdb.open(str(encoded_eurosat_ms_path), readonly=True)
 
     with env.begin(write=False) as txn:
         cur = txn.cursor()
         decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
 
-    # The encoded data is nested inside of another safetensor dictionary,
-    # where the inner keys are derived from color mapping
-    decoded_dicts = [d for d in decoded_lmdb_data.values()]
+    decoded_lmdb_data.keys() == set(["AnnualCrop_1", "Pasture_300", "SeaLake_3000"])
 
-    # Simply check if the data remains identical, as this is the only _true_ thing I care about from the Python viewpoint
-    # Here I iterate over all file name and raster data as dictionaries pairs
-    # and then for each raster data dictionary iterate over all key-value pairs, where the key is the band name
-    # in the same style as the LMDB file and check if the LMDB file contained a matching array from
-    # a safetensors dictionary accessed via the shared band name as key.
-    for source_file, source_data_dict in source_file_data.items():
-        for source_key, source_data in source_data_dict.items():
-            assert any(
-                np.array_equal(source_data, decoded_dict[source_key])
-                for decoded_dict in decoded_dicts
-            ), f"Couldn't find data in the LMDB database that matches the data from: {source_file}:{source_key}"
+    sample_safetensors_dict = decoded_lmdb_data.get("AnnualCrop_1")
+    safetensors_keys = sample_safetensors_dict.keys()
+    assert (
+        set(
+            [
+                "B01",
+                "B02",
+                "B03",
+                "B04",
+                "B05",
+                "B06",
+                "B07",
+                "B08",
+                "B09",
+                "B10",
+                "B11",
+                "B12",
+                "B08A",
+            ]
+        )
+        == safetensors_keys
+    )
+
+    assert all(arr.shape == (64, 64) for arr in sample_safetensors_dict.values())
+    assert all(arr.dtype == "uint16" for arr in sample_safetensors_dict.values())

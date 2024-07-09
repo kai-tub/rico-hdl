@@ -144,6 +144,7 @@
                   })
                 pkgs.poetry
                 pkgs.quarto
+                pkgs.gdal
               ]
               ++ self.checks.${system}.pre-commit-check.enabledPackages;
           })

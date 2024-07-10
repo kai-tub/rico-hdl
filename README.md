@@ -48,6 +48,7 @@ Currently, `rico-hdl` supports:
 - [HySpecNet-11k][hyspecnet]
 - [UC Merced Land Use][ucmerced]
 - [EuroSAT][euro]
+- [SSL4EO-S12][ssl4eo-s12]
 
 Additional datasets will be added in the near future.
 
@@ -105,18 +106,18 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
   },
 'S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP':
   {
-    'B01': <120x120 uint16 safetensors image data>,
+    'B01': <30x30   uint16 safetensors image data>,
     'B02': <120x120 uint16 safetensors image data>,
     'B03': <120x120 uint16 safetensors image data>,
     'B04': <120x120 uint16 safetensors image data>,
-    'B05': <120x120 uint16 safetensors image data>,
-    'B06': <120x120 uint16 safetensors image data>,
-    'B07': <120x120 uint16 safetensors image data>,
+    'B05': <60x60   uint16 safetensors image data>,
+    'B06': <60x60   uint16 safetensors image data>,
+    'B07': <60x60   uint16 safetensors image data>,
     'B08': <120x120 uint16 safetensors image data>,
-    'B8A': <120x120 uint16 safetensors image data>,
-    'B09': <120x120 uint16 safetensors image data>,
-    'B11': <120x120 uint16 safetensors image data>,
-    'B12': <120x120 uint16 safetensors image data>,
+    'B8A': <60x60   uint16 safetensors image data>,
+    'B09': <30x30   uint16 safetensors image data>,
+    'B11': <60x60   uint16 safetensors image data>,
+    'B12': <60x60   uint16 safetensors image data>,
   }
 ```
 
@@ -477,6 +478,211 @@ tensor = np.stack([safetensor_dict[key] for key in [
 assert tensor.shape == (13, 64, 64)
 ```
 
+## [SSL4EO-S12][ssl4eo-s12] Example
+
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
+Then, to convert the Sentinel-1, Sentinel-2 L1C, and Sentinel-2 L2A
+patches from the [SSL4EO-S12][ssl4eo-s12]
+dataset into the optimized format, call the application with:
+
+```bash
+rico-hdl ssl4eo-s12 --s1-dir <S1_ROOT_DIR> --s2-l1c-dir <S2_L1C_ROOT_DIR> --s2-l2a-dir <S2_L2A_ROOT_DIR> --target-dir Encoded-SSL4EO-S12
+```
+
+In [SSL4EO-S12][ssl4eo-s12], each band is stored as a separate file with the associate band as a name (`B1.tif`, `B9.tif`, `B10.tif`, `VV.tif`, ...).
+The encoder groups all image files with the same name/prefix and stores the data as a [safetensors][s] dictionary,
+where the dictionary's key is the band name (`B1`, `B9`, `B10`, `VV`, ...).
+
+<details>
+  <summary>Example Input</summary>
+
+```
+<SSL4EO-S12 ROOT DIRECTORY>
+├── s1
+│  └── 0000200
+│     ├── S1A_IW_GRDH_1SDV_20200607T010800_20200607T010825_032904_03CFBA_D457
+│     │  ├── metadata.json
+│     │  ├── VH.tif
+│     │  └── VV.tif
+│     └── S1A_IW_GRDH_1SDV_20200903T131212_20200903T131237_034195_03F8F5_AC1C
+│        ├── metadata.json
+│        ├── VH.tif
+│        └── VV.tif
+├── s2a
+│  └── 0000200
+│     ├── 20200604T054639_20200604T054831_T43RCP
+│     │  ├── B1.tif
+│     │  ├── B2.tif
+│     │  ├── B3.tif
+│     │  ├── B4.tif
+│     │  ├── B5.tif
+│     │  ├── B6.tif
+│     │  ├── B7.tif
+│     │  ├── B8.tif
+│     │  ├── B8A.tif
+│     │  ├── B9.tif
+│     │  ├── B11.tif
+│     │  ├── B12.tif
+│     │  └── metadata.json
+│     └── 20200813T054639_20200813T054952_T43RCP
+│        ├── B1.tif
+│        ├── B2.tif
+│        ├── B3.tif
+│        ├── B4.tif
+│        ├── B5.tif
+│        ├── B6.tif
+│        ├── B7.tif
+│        ├── B8.tif
+│        ├── B8A.tif
+│        ├── B9.tif
+│        ├── B11.tif
+│        ├── B12.tif
+│        └── metadata.json
+└── s2c
+   └── 0000200
+      ├── 20200604T054639_20200604T054831_T43RCP
+      │  ├── B1.tif
+      │  ├── B2.tif
+      │  ├── B3.tif
+      │  ├── B4.tif
+      │  ├── B5.tif
+      │  ├── B6.tif
+      │  ├── B7.tif
+      │  ├── B8.tif
+      │  ├── B8A.tif
+      │  ├── B9.tif
+      │  ├── B10.tif
+      │  ├── B11.tif
+      │  ├── B12.tif
+      │  └── metadata.json
+      └── 20200823T054639_20200823T055618_T43RCP
+         ├── B1.tif
+         ├── B2.tif
+         ├── B3.tif
+         ├── B4.tif
+         ├── B5.tif
+         ├── B6.tif
+         ├── B7.tif
+         ├── B8.tif
+         ├── B8A.tif
+         ├── B9.tif
+         ├── B10.tif
+         ├── B11.tif
+         ├── B12.tif
+         └── metadata.json
+```
+
+</details>
+
+<details>
+  <summary>LMDB Result</summary>
+
+Note: We merge the patch directory with the two upper parent directories.
+This path merging ensures that values are unique and that the entire
+SSL4EO-S12 dataset can be stored in a single LMDB database.
+
+And the authors of SSL4EO-S12 did not ensure that the resulting patches have
+a consistent size! There are some patches that have an additional row/column
+
+```
+'s1_0000200_S1A_IW_GRDH_1SDV_20200607T010800_20200607T010825_032904_03CFBA_D457':
+  {
+    'VH': <264x264 float32 safetensors image data>
+    'VV': <264x264 float32 safetensors image data>
+  },
+'s1_0000200_S1A_IW_GRDH_1SDV_20200903T131212_20200903T131237_034195_03F8F5_AC1C':
+  {
+    'VH': <264x264 float32 safetensors image data>
+    'VV': <264x264 float32 safetensors image data>
+  },
+'s2a_0000200_20200604T054639_20200604T054831_T43RCP': {
+    'B1':  <44x44   uint16 safetensors image data>
+    'B2':  <264x264 uint16 safetensors image data>
+    'B3':  <264x264 uint16 safetensors image data>
+    'B4':  <264x264 uint16 safetensors image data>
+    'B5':  <132x132 uint16 safetensors image data>
+    'B6':  <132x132 uint16 safetensors image data>
+    'B7':  <132x132 uint16 safetensors image data>
+    'B8':  <132x132 uint16 safetensors image data>
+    'B8A': <132x132 uint16 safetensors image data>
+    'B9':  <44x44   uint16 safetensors image data>
+    'B10': <44x44   uint16 safetensors image data>
+    'B11': <132x132 uint16 safetensors image data>
+    'B12': <132x132 uint16 safetensors image data>
+  },
+'s2a_0000200_20200813T054639_20200813T054952_T43RCP': {
+    'B1':  <44x44   uint16 safetensors image data>
+    'B2':  <264x264 uint16 safetensors image data>
+    'B3':  <264x264 uint16 safetensors image data>
+    'B4':  <264x264 uint16 safetensors image data>
+    'B5':  <132x132 uint16 safetensors image data>
+    'B6':  <132x132 uint16 safetensors image data>
+    'B7':  <132x132 uint16 safetensors image data>
+    'B8':  <132x132 uint16 safetensors image data>
+    'B8A': <132x132 uint16 safetensors image data>
+    'B9':  <44x44   uint16 safetensors image data>
+    'B10': <44x44   uint16 safetensors image data>
+    'B11': <132x132 uint16 safetensors image data>
+    'B12': <132x132 uint16 safetensors image data>
+  },
+'s2c_0000200_20200604T054639_20200604T054831_T43RCP': {
+    'B1':  <44x44   uint16 safetensors image data>
+    'B2':  <264x264 uint16 safetensors image data>
+    'B3':  <264x264 uint16 safetensors image data>
+    'B4':  <264x264 uint16 safetensors image data>
+    'B5':  <132x132 uint16 safetensors image data>
+    'B6':  <132x132 uint16 safetensors image data>
+    'B7':  <132x132 uint16 safetensors image data>
+    'B8':  <132x132 uint16 safetensors image data>
+    'B8A': <132x132 uint16 safetensors image data>
+    'B9':  <44x44   uint16 safetensors image data>
+    'B11': <132x132 uint16 safetensors image data>
+    'B12': <132x132 uint16 safetensors image data>
+  },
+'s2c_0000200_20200823T054639_20200823T055618_T43RCP': {
+    'B1':  <44x44   uint16 safetensors image data>
+    'B2':  <264x264 uint16 safetensors image data>
+    'B3':  <264x264 uint16 safetensors image data>
+    'B4':  <264x264 uint16 safetensors image data>
+    'B5':  <132x132 uint16 safetensors image data>
+    'B6':  <132x132 uint16 safetensors image data>
+    'B7':  <132x132 uint16 safetensors image data>
+    'B8':  <132x132 uint16 safetensors image data>
+    'B8A': <132x132 uint16 safetensors image data>
+    'B9':  <44x44   uint16 safetensors image data>
+    'B11': <132x132 uint16 safetensors image data>
+    'B12': <132x132 uint16 safetensors image data>
+  },
+```
+
+</details>
+
+The following code shows how to access the converted database:
+
+```python
+import lmdb
+# import desired deep-learning library:
+# numpy, torch, tensorflow, paddle, flax, mlx
+from safetensors.numpy import load
+from pathlib import Path
+
+# path to the encoded dataset/output of rico-hdl
+encoded_path = Path("./Encoded-SSL4EO-S12")
+
+# Make sure to only open the environment once
+# and not everytime an item is accessed.
+env = lmdb.open(str(encoded_path), readonly=True)
+
+with env.begin() as txn:
+  # string encoding is required to map the string to an LMDB key
+  safetensor_dict = load(txn.get("s2c_0000200_20200823T054639_20200823T055618_T43RCP".encode()))
+
+rgb_bands = ["B4", "B3", "B2"]
+rgb_tensor = np.stack([safetensor_dict[b] for b in rgb_bands])
+assert rgb_tensor.shape == (3, 264, 264)
+```
+
 
 ## Design
 
@@ -540,3 +746,4 @@ If you use this work, please cite:
 [pys]: https://github.com/huggingface/safetensors
 [ucmerced]: http://weegee.vision.ucmerced.edu/datasets/landuse.html
 [euro]: https://zenodo.org/records/7711810
+[ssl4eo-s12]: https://github.com/zhu-xlab/SSL4EO-S12

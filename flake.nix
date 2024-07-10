@@ -59,10 +59,17 @@
             --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.fd]}
         '';
         meta.mainProgram = "rico-hdl";
+        # The SSL4EO-S12 base folder is copied instead of the individual base directories
+        # as otherwise the directory would be prefixed with the hash of the directory
+        # and would result in an unpredictable LMDB key name, as the base directory name
+        # is used for the test.
         checkPhase = ''
           export PATH="$out/bin:$PATH"
           export RICO_HDL_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
           export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
+          export RICO_HDL_SSL4EO_S12_S1_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s1
+          export RICO_HDL_SSL4EO_S12_S2_L1C_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s2c
+          export RICO_HDL_SSL4EO_S12_S2_L2A_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s2a
           export RICO_HDL_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
           export RICO_HDL_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
           export RICO_HDL_UC_MERCED_PATH=${./integration_tests/tiffs/UCMerced_LandUse}
@@ -132,6 +139,9 @@
             env.RICO_HDL_S2_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
             env.RICO_HDL_LMDB_REF_PATH = "${config.env.DEVENV_ROOT}/integration_tests/BigEarthNet_LMDB";
             env.JUPYTER_PATH = "${pkgs.python3Packages.jupyterlab}/share/jupyter";
+            env.RICO_HDL_SSL4EO_S12_S1_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/SSL4EO-S12/s1";
+            env.RICO_HDL_SSL4EO_S12_S2_L1C_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/SSL4EO-S12/s2c";
+            env.RICO_HDL_SSL4EO_S12_S2_L2A_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/SSL4EO-S12/s2a";
             packages =
               [
                 (mkPoetryEnv

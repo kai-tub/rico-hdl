@@ -1,6 +1,6 @@
 import os
 import typer
-from typing import TypeAlias
+from typing import TypeAlias, Optional
 from typing_extensions import Annotated
 import lmdb
 from safetensors.numpy import save
@@ -33,12 +33,46 @@ BIGEARTHNET_S2_ORDERING = [
     "B09",
 ]
 
+SSL4EO_S12_S1_ORDERING = ["VH", "VV"]
+SSL4EO_S12_S2_L1C_ORDERING = [
+    "B2",
+    "B3",
+    "B4",
+    "B8",
+    "B5",
+    "B6",
+    "B7",
+    "B8A",
+    "B10",
+    "B11",
+    "B12",
+    "B1",
+    "B9",
+]
+
+SSL4EO_S12_S2_L2A_ORDERING = [
+    "B2",
+    "B3",
+    "B4",
+    "B8",
+    "B5",
+    "B6",
+    "B7",
+    "B8A",
+    "B11",
+    "B12",
+    "B1",
+    "B9",
+]
+
 # Defined in the order of the bands!
 # Order taken from (and only implicitely confirmed in):
 # https://github.com/phelber/EuroSAT/issues/7#issuecomment-916754970
 # Visualizing the individual bands supports the ordering, as one
 # can see the different interpolation strengths for the 20 and 60m
 # bands.
+# This should be index band mapping and the ordering within the saftensor
+# can then be independent
 EUROSAT_MS_BANDS = [
     "B01",
     "B02",
@@ -110,23 +144,6 @@ def read_single_band_raster(path: Path, index: int = 1, is_georeferenced: bool =
         return r.read(index)
 
 
-def s2_read_tif(path: Path):
-    # could also have the logic to try out .tiff
-    if not path.exists():
-        raise Exception(
-            f"Could not find file: {path}\nThe S2 dataset is probably incomplete/broken!"
-        )
-    return read_single_band_raster(path)
-
-
-def s1_read_tif(path: Path):
-    if not path.exists():
-        raise Exception(
-            f"Could not find file: {path}\nThe S1 dataset is probably incomplete/broken!"
-        )
-    return read_single_band_raster(path)
-
-
 def bigearthnet_s2_to_safetensor(patch_path: str) -> bytes:
     """
     Given the path to a BigEarthNet-S2 patch directory
@@ -139,8 +156,62 @@ def bigearthnet_s2_to_safetensor(patch_path: str) -> bytes:
     # to order the safetensor entries!
     p = Path(patch_path)
     data = {
-        band: s2_read_tif(p.joinpath(f"{p.stem}_{band}.tif"))
+        band: read_single_band_raster(p.joinpath(f"{p.stem}_{band}.tif"))
         for band in BIGEARTHNET_S2_ORDERING
+    }
+    return save(data, metadata=None)
+
+
+def ssl4eo_s1_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a SSL4EO-S12-S1 patch directory
+    (NOT the individual TIFF files), read the individual
+    band files in a pre-defined order and convert it
+    into a serialized safetensor dictionary.
+    """
+    # In Python the dictionary insertion order is stable!
+    # order the data here to make it clear that we are doing it
+    # to order the safetensor entries!
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p.joinpath(f"{band}.tif"))
+        for band in SSL4EO_S12_S1_ORDERING
+    }
+    return save(data, metadata=None)
+
+
+def ssl4eo_s2_l1c_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a SSL4EO-S12-S2 L1C patch directory
+    (NOT the individual TIFF files), read the individual
+    band files in a pre-defined order and convert it
+    into a serialized safetensor dictionary.
+    """
+    # In Python the dictionary insertion order is stable!
+    # order the data here to make it clear that we are doing it
+    # to order the safetensor entries!
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p.joinpath(f"{band}.tif"))
+        for band in SSL4EO_S12_S2_L1C_ORDERING
+    }
+    return save(data, metadata=None)
+
+
+def ssl4eo_s2_l2a_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a SSL4EO-S12-S2 L2A patch directory
+    (NOT the individual TIFF files), read the individual
+    band files in a pre-defined order and convert it
+    into a serialized safetensor dictionary.
+    """
+    # In Python the dictionary insertion order is stable!
+    # order the data here to make it clear that we are doing it
+    # to order the safetensor entries!
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p.joinpath(f"{band}.tif"))
+        for band in SSL4EO_S12_S2_L2A_ORDERING
     }
     return save(data, metadata=None)
 
@@ -195,11 +266,12 @@ def uc_merced(
     lmdb_writer(env, patch_paths, encode_stem, uc_merced_to_safetensor)
 
 
+# I will only add support for the RGB version if somebody explicitely asks
+# for it. I want to encourage users to use the actual tiff data instead.
 @app.command()
 def eurosat_multi_spectral(
     target_dir: TargetDir,
     dataset_dir: DatasetDir,
-    # RGB ?
 ):
     """
     [EuroSAT Multi-Spectral](https://doi.org/10.5281/zenodo.7711810) converter.
@@ -265,6 +337,19 @@ def encode_stem(path: str) -> bytes:
     return str(Path(path).stem).encode()
 
 
+# yeah, this could be done more generic but it can still be refactored
+# if it is really needed in different variations.
+def encode_three_levels(path: str, join_char: str = "_") -> bytes:
+    """
+    Given a path that is at least three levels deep, concatenate the names
+    of the three deepest names.
+
+    Example: `/home/user/name/patch` -> `user_name_patch`
+    """
+    p = Path(path)
+    return join_char.join([p.parent.parent.name, p.parent.name, p.name]).encode()
+
+
 def eurosat_ms_to_safetensor(patch_path: str) -> bytes:
     """
     Given the path to a multi-spectral EuroSAT patch file (`.tif` file),
@@ -323,6 +408,7 @@ def fast_find(
     search_directory: str,
     only_dir: bool = True,
     threads: int = os.cpu_count(),
+    exact_depth: Optional[int] = None,
 ) -> list[str]:
     """
     Use `fd` to quickly find all files/directories that match a given regular expression.
@@ -341,7 +427,8 @@ def fast_find(
             "--regex",
             regex,
         ]
-        + (["--type=directory"] if only_dir else []),
+        + (["--type=directory"] if only_dir else [])
+        + ([f"--exact-depth={exact_depth}"] if exact_depth is not None else []),
         text=True,
     ).splitlines()
 
@@ -395,6 +482,91 @@ def bigearthnet(
     if bigearthnet_s2_dir is not None:
         log.debug("Writing BigEarthNet-S2 data into LMDB")
         lmdb_writer(env, s2_patch_paths, encode_stem, bigearthnet_s2_to_safetensor)
+
+
+@app.command()
+def ssl4eo_s12(
+    target_dir: TargetDir,
+    s1_dir: DatasetDir = None,
+    s2_l1c_dir: DatasetDir = None,
+    s2_l2a_dir: DatasetDir = None,
+):
+    """
+    [SSL4EO-S12 Sentinel-1, Sentinel-2 L1C, and Sentinel-2 L2A](https://github.com/zhu-xlab/SSL4EO_S12-S12) converter.
+    If all source directories are given, they will be written to the same LMDB file.
+
+    The LMDB keys will be the normalized path to the patches
+    (i.e., no `_BXY.tif` suffix).
+    An example key for the path:
+    - `s1/0000200/S1A_IW_GRDH_1SDV_20200607T010800_20200607T010825_032904_03CFBA_D457/`
+    would be
+    - `s1_0000200_S1A_IW_GRDH_1SDV_20200607T010800_20200607T010825_032904_03CFBA_D457`
+
+    and for the path:
+    - `s2a/0000200/20200604T054639_20200604T054831_T43RCP`
+    would be
+    - `s2a_0000200_20200604T054639_20200604T054831_T43RCP`
+
+    The `safetensors` keys relate to the associate band (for example: `B1`, `B8A`, `VV`, `B10`),
+    which depends on the selected sub-dataset.
+
+    NOTE: We recommend to download the dataset from huggingface, as the download is much more reliable.
+    To unpack the data simply run `cat s1*.tar.gz | tar -xzf -`
+    """
+    log.debug("Will first collect all files and ensure that some patches are found.")
+
+    if (s1_dir is None) and (s2_l1c_dir is None) and (s2_l2a_dir is None):
+        log.error("Please provide at least one directory path")
+        exit(-1, "No source directory is specified")
+
+    if s1_dir is not None:
+        log.info(f"Searching for patches in: {s1_dir}")
+        # use fastest matching logic; will fail if directory has been touched or changed
+        s1_patch_paths = fast_find(".", s1_dir, only_dir=True, exact_depth=2)
+        num_s1_patch_paths = len(s1_patch_paths)
+        log.debug(f"Found {num_s1_patch_paths} S1 patches.")
+        assert num_s1_patch_paths > 0
+
+    if s2_l1c_dir is not None:
+        log.info(f"Seaching for patches in: {s2_l1c_dir}")
+        s2_l1c_patch_paths = fast_find(".", s2_l1c_dir, only_dir=True, exact_depth=2)
+        # use fastest matching logic; will fail if directory has been touched or changed
+        num_s2_l1c_patch_paths = len(s2_l1c_patch_paths)
+        log.debug(f"Found {num_s2_l1c_patch_paths} S2 L1C patches.")
+        assert num_s2_l1c_patch_paths > 0
+
+    if s2_l2a_dir is not None:
+        log.info(f"Seaching for patches in: {s2_l2a_dir}")
+        s2_l2a_patch_paths = fast_find(".", s2_l2a_dir, only_dir=True, exact_depth=2)
+        # use fastest matching logic; will fail if directory has been touched or changed
+        num_s2_l2a_patch_paths = len(s2_l2a_patch_paths)
+        log.debug(f"Found {num_s2_l2a_patch_paths} S2 L2A patches.")
+        assert num_s2_l2a_patch_paths > 0
+
+    # postpone writing until AFTER both dataset files have been assembled.
+    # Otherwise an error in the latter CLI argument could produce an incomplete LMDB
+    env = open_lmdb(target_dir)
+
+    # Above we are matching all directories that are two levels deep relative to
+    # the given base directory. As the s2-l2a and s2-l1c sub-paths are identical
+    # for a given tile, we need to embed the base directory name `s2c` and `s2a`
+    # to allow writing a single LMDB file.
+    # For consistency, we do the same for the S1 data
+    if s1_dir is not None:
+        log.debug("Writing SSL4EO-S12-S1 data into LMDB")
+        lmdb_writer(env, s1_patch_paths, encode_three_levels, ssl4eo_s1_to_safetensor)
+
+    if s2_l1c_dir is not None:
+        log.debug("Writing SSL4EO-S12-S2 L1C data into LMDB")
+        lmdb_writer(
+            env, s2_l1c_patch_paths, encode_three_levels, ssl4eo_s2_l1c_to_safetensor
+        )
+
+    if s2_l2a_dir is not None:
+        log.debug("Writing SSL4EO-S12-S2 L2A data into LMDB")
+        lmdb_writer(
+            env, s2_l2a_patch_paths, encode_three_levels, ssl4eo_s2_l2a_to_safetensor
+        )
 
 
 def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):

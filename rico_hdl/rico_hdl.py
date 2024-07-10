@@ -103,7 +103,7 @@ into safetensor dictionary entries and write the result into the high-throughput
 LMDB database at the given `target_dir` location.
 """
 
-app = typer.Typer(help=GENERAL_HELP_TEXT)
+app = typer.Typer(help=GENERAL_HELP_TEXT, rich_markup_mode="markdown")
 
 # `type` is too new for pylsp
 TargetDir: TypeAlias = Annotated[
@@ -242,8 +242,7 @@ def uc_merced(
     """
     [UC Merced Land Use Dataset](http://weegee.vision.ucmerced.edu/datasets/landuse.html) converter.
 
-    The LMDB keys will be the names of the UC Merced patches without the
-    `.tif` suffix.
+    The LMDB keys will be the names of the UC Merced patches without the `.tif` suffix.
 
     The `safetensor` keys are [`Red`, `Green`, `Blue`] to indicate the respective
     channel meaning.
@@ -283,6 +282,7 @@ def eurosat_multi_spectral(
     [EuroSAT paper](https://ieeexplore.ieee.org/abstract/document/8736785).
 
     NOTE: No atmospheric correction has been applied to the dataset
+
     NOTE: Lower spatial resolution bands were upsampled to 10m spatial resolution
     using cubic-spline interpolation.
     """
@@ -307,7 +307,7 @@ def hyspecnet_11k(
     dataset_dir: DatasetDir,
 ):
     """
-    HySpecNet-11k converter.
+    [HySpecNet-11k](https://datadryad.org/stash/dataset/doi:10.5061/dryad.fttdz08zh) converter.
 
     The LMDB keys will be the names of the HySpecNet-11k patches without the
     `-SPECTRAL_IMAGE.TIF` suffix.
@@ -441,8 +441,8 @@ def bigearthnet(
 ):
     """
     [BigEarthNet-S1 and BigEarthNet-S2](https://doi.org/10.5281/zenodo.10891137) converter.
-    If both source directories are given, both of them will be written to the same LMDB file.
 
+    If both source directories are given, both of them will be written to the same LMDB file.
     The LMDB keys will be the names of the BigEarthNet-S1/S2 patches (i.e., no `_BXY.tif` suffix).
     The `safetensors` keys relate to the associate band (for example: `B01`, `B8A`, `B12`, `VV`).
     """
@@ -493,19 +493,28 @@ def ssl4eo_s12(
 ):
     """
     [SSL4EO-S12 Sentinel-1, Sentinel-2 L1C, and Sentinel-2 L2A](https://github.com/zhu-xlab/SSL4EO_S12-S12) converter.
-    If all source directories are given, they will be written to the same LMDB file.
 
-    The LMDB keys will be the normalized path to the patches
-    (i.e., no `_BXY.tif` suffix).
-    An example key for the path:
+    If all source directories are given, they will be written to the same LMDB file.
+    The LMDB keys will be the normalized path to the patches where the two parent
+    directories are merged with `_`.
+
+    For example, the path:
+
     - `s1/0000200/S1A_IW_GRDH_1SDV_20200607T010800_20200607T010825_032904_03CFBA_D457/`
-    would be
+
+    would have the key
+
     - `s1_0000200_S1A_IW_GRDH_1SDV_20200607T010800_20200607T010825_032904_03CFBA_D457`
 
-    and for the path:
+    and the path:
+
     - `s2a/0000200/20200604T054639_20200604T054831_T43RCP`
-    would be
+
+    would have the key
+
     - `s2a_0000200_20200604T054639_20200604T054831_T43RCP`
+
+    ---
 
     The `safetensors` keys relate to the associate band (for example: `B1`, `B8A`, `VV`, `B10`),
     which depends on the selected sub-dataset.

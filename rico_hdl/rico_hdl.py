@@ -91,6 +91,25 @@ EUROSAT_MS_BANDS = [
 
 BIGEARTHNET_S1_ORDERING = ["VH", "VV"]
 
+# Same as BigEarthNet ordering
+# for whatever reason decided to use lower case here
+MAJOR_TOM_S1_ORDERING = ["vh", "vv"]
+
+MAJOR_TOM_S2_ORDERING = [
+    "B02",
+    "B03",
+    "B04",
+    "B08",
+    "B05",
+    "B06",
+    "B07",
+    "B8A",
+    "B11",
+    "B12",
+    "B01",
+    "B09",
+]
+
 NUM_HYSPECNET_BANDS = 224
 # see output of `gdalinfo`
 UC_MERCED_BAND_IDX_COLOR_MAPPING = {1: "Red", 2: "Green", 3: "Blue"}
@@ -142,24 +161,6 @@ def read_single_band_raster(path: Path, index: int = 1, is_georeferenced: bool =
         warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
     with rasterio.open(path) as r:
         return r.read(index)
-
-
-def bigearthnet_s2_to_safetensor(patch_path: str) -> bytes:
-    """
-    Given the path to a BigEarthNet-S2 patch directory
-    (NOT the individual TIFF files), read the individual
-    band files in a pre-defined order and convert it
-    into a serialized safetensor dictionary.
-    """
-    # In Python the dictionary insertion order is stable!
-    # order the data here to make it clear that we are doing it
-    # to order the safetensor entries!
-    p = Path(patch_path)
-    data = {
-        band: read_single_band_raster(p.joinpath(f"{p.stem}_{band}.tif"))
-        for band in BIGEARTHNET_S2_ORDERING
-    }
-    return save(data, metadata=None)
 
 
 def ssl4eo_s1_to_safetensor(patch_path: str) -> bytes:
@@ -234,10 +235,65 @@ def bigearthnet_s1_to_safetensor(patch_path: str) -> bytes:
     return save(data, metadata=None)
 
 
+def bigearthnet_s2_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a BigEarthNet-S2 patch directory
+    (NOT the individual TIFF files), read the individual
+    band files in a pre-defined order and convert it
+    into a serialized safetensor dictionary.
+    """
+    # In Python the dictionary insertion order is stable!
+    # order the data here to make it clear that we are doing it
+    # to order the safetensor entries!
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p.joinpath(f"{p.stem}_{band}.tif"))
+        for band in BIGEARTHNET_S2_ORDERING
+    }
+    return save(data, metadata=None)
+
+
+def major_tom_core_s1_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a Major TOM Core S1 patch directory
+    (NOT the individual TIFF files), read the individual
+    band files in a pre-defined order and convert it
+    into a serialized safetensor dictionary.
+    """
+    # In Python the dictionary insertion order is stable!
+    # order the data here to make it clear that we are doing it
+    # to order the safetensor entries!
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p.joinpath(f"{band}.tif"))
+        for band in MAJOR_TOM_S1_ORDERING
+    }
+    return save(data, metadata=None)
+
+
+def major_tom_core_s2_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a Major TOM Core S2 patch directory
+    (NOT the individual TIFF files), read the individual
+    band files in a pre-defined order and convert it
+    into a serialized safetensor dictionary.
+    """
+    # In Python the dictionary insertion order is stable!
+    # order the data here to make it clear that we are doing it
+    # to order the safetensor entries!
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p.joinpath(f"{band}.tif"))
+        for band in MAJOR_TOM_S2_ORDERING
+    }
+    return save(data, metadata=None)
+
+
 @app.command()
 def uc_merced(
     target_dir: TargetDir,
     dataset_dir: DatasetDir,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
 ):
     """
     [UC Merced Land Use Dataset](http://weegee.vision.ucmerced.edu/datasets/landuse.html) converter.
@@ -246,6 +302,8 @@ def uc_merced(
 
     The `safetensor` keys are [`Red`, `Green`, `Blue`] to indicate the respective
     channel meaning.
+
+    NOTE: `num_workers` defaults to number of available threads.
     """
     # FUTURE: Allow keeping it together and only have a single joined RGB tensor
     # -> This is possible but kinda defeats the purpose of wrapping it in a saftensor
@@ -262,7 +320,9 @@ def uc_merced(
     assert num_patch_paths > 0
     env = open_lmdb(target_dir)
     log.debug("Writing UC Merced data into LMDB")
-    lmdb_writer(env, patch_paths, encode_stem, uc_merced_to_safetensor)
+    lmdb_writer(
+        env, patch_paths, encode_stem, uc_merced_to_safetensor, max_workers=num_workers
+    )
 
 
 # I will only add support for the RGB version if somebody explicitely asks
@@ -271,6 +331,7 @@ def uc_merced(
 def eurosat_multi_spectral(
     target_dir: TargetDir,
     dataset_dir: DatasetDir,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
 ):
     """
     [EuroSAT Multi-Spectral](https://doi.org/10.5281/zenodo.7711810) converter.
@@ -285,6 +346,8 @@ def eurosat_multi_spectral(
 
     NOTE: Lower spatial resolution bands were upsampled to 10m spatial resolution
     using cubic-spline interpolation.
+
+    NOTE: `num_workers` defaults to number of available threads.
     """
     log.info(f"Searching for patches in: {dataset_dir}")
     # this could match the file paths directly
@@ -298,13 +361,16 @@ def eurosat_multi_spectral(
     env = open_lmdb(target_dir)
     log.debug("Writing EuroSAT_MS data into LMDB")
     # Understand what the Band mapping is!
-    lmdb_writer(env, patch_paths, encode_stem, eurosat_ms_to_safetensor)
+    lmdb_writer(
+        env, patch_paths, encode_stem, eurosat_ms_to_safetensor, max_workers=num_workers
+    )
 
 
 @app.command()
 def hyspecnet_11k(
     target_dir: TargetDir,
     dataset_dir: DatasetDir,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
 ):
     """
     [HySpecNet-11k](https://datadryad.org/stash/dataset/doi:10.5061/dryad.fttdz08zh) converter.
@@ -315,6 +381,8 @@ def hyspecnet_11k(
     (for example: `B1`, `B12`, `B122`).
 
     NOTE: Band indexes start with 1 and not 0!
+
+    NOTE: `num_workers` defaults to number of available threads.
     """
     log.info(f"Searching for patches in: {dataset_dir}")
     # this could match the file paths directly
@@ -327,7 +395,9 @@ def hyspecnet_11k(
     assert num_patch_paths > 0
     env = open_lmdb(target_dir)
     log.debug("Writing HyspecNet-11k data into LMDB")
-    lmdb_writer(env, patch_paths, encode_stem, hyspecnet_to_safetensor)
+    lmdb_writer(
+        env, patch_paths, encode_stem, hyspecnet_to_safetensor, max_workers=num_workers
+    )
 
 
 def encode_stem(path: str) -> bytes:
@@ -339,6 +409,17 @@ def encode_stem(path: str) -> bytes:
 
 # yeah, this could be done more generic but it can still be refactored
 # if it is really needed in different variations.
+def encode_with_parent(path: str, join_char: str = "_") -> bytes:
+    """
+    Given a path that is at least one parent directory, concatenate the
+    directory name and the current file.
+
+    Example: `/home/user/patch/band` -> `patch_band`
+    """
+    p = Path(path)
+    return join_char.join([p.parent.name, p.name]).encode()
+
+
 def encode_three_levels(path: str, join_char: str = "_") -> bytes:
     """
     Given a path that is at least three levels deep, concatenate the names
@@ -438,6 +519,7 @@ def bigearthnet(
     target_dir: TargetDir,
     bigearthnet_s1_dir: DatasetDir = None,
     bigearthnet_s2_dir: DatasetDir = None,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
 ):
     """
     [BigEarthNet-S1 and BigEarthNet-S2](https://doi.org/10.5281/zenodo.10891137) converter.
@@ -445,6 +527,8 @@ def bigearthnet(
     If both source directories are given, both of them will be written to the same LMDB file.
     The LMDB keys will be the names of the BigEarthNet-S1/S2 patches (i.e., no `_BXY.tif` suffix).
     The `safetensors` keys relate to the associate band (for example: `B01`, `B8A`, `B12`, `VV`).
+
+    NOTE: `num_workers` defaults to number of available threads.
     """
     log.debug("Will first collect all files and ensure that some patches are found.")
     if (bigearthnet_s1_dir is None) and (bigearthnet_s2_dir is None):
@@ -477,11 +561,87 @@ def bigearthnet(
 
     if bigearthnet_s1_dir is not None:
         log.debug("Writing BigEarthNet-S1 data into LMDB")
-        lmdb_writer(env, s1_patch_paths, encode_stem, bigearthnet_s1_to_safetensor)
+        lmdb_writer(
+            env,
+            s1_patch_paths,
+            encode_stem,
+            bigearthnet_s1_to_safetensor,
+            max_workers=num_workers,
+        )
 
     if bigearthnet_s2_dir is not None:
         log.debug("Writing BigEarthNet-S2 data into LMDB")
-        lmdb_writer(env, s2_patch_paths, encode_stem, bigearthnet_s2_to_safetensor)
+        lmdb_writer(
+            env,
+            s2_patch_paths,
+            encode_stem,
+            bigearthnet_s2_to_safetensor,
+            max_workers=num_workers,
+        )
+
+
+@app.command()
+def major_tom_core(
+    target_dir: TargetDir,
+    s1_dir: DatasetDir = None,
+    s2_dir: DatasetDir = None,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
+):
+    """
+    [Major TOM Core S1 & S2](https://github.com/ESA-PhiLab/Major-TOM/tree/main) converter.
+
+    If both source directories are given, both of them will be written to the same LMDB file.
+    The LMDB keys will be the names of the patches/product ids (i.e., no band (`_BXY`) suffix) prefixed
+    with the grid cell `X_Y_` to generate a unique name.
+    The `safetensors` keys relate to the associate band (for example: `B01`, `B8A`, `B12`, `vv`).
+
+    NOTE: Requires the data to be downloaded via the [official download script](https://github.com/ESA-PhiLab/Major-TOM/blob/main/src/metadata_helpers.py).
+    NOTE: The `cloud_mask` is NOT encoded in the safetensor.
+    NOTE: `num_workers` defaults to number of available threads.
+    """
+    log.debug("Will first collect all files and ensure that some patches are found.")
+    if (s1_dir is None) and (s2_dir is None):
+        log.error("Please provide at least one directory path")
+        exit(-1, "No source directory is specified")
+
+    if s1_dir is not None:
+        log.info(f"Searching for patches in: {s1_dir}")
+        s1_patch_paths = fast_find(r"S1[AB]_IW_GRDH_.*_rtc$", s1_dir, only_dir=True)
+        num_s1_patch_paths = len(s1_patch_paths)
+        log.debug(f"Found {num_s1_patch_paths} S1 patches.")
+        assert num_s1_patch_paths > 0
+
+    if s2_dir is not None:
+        log.info(f"Seaching for patches in: {s2_dir}")
+        s2_patch_paths = fast_find(r"S2[AB]_MSIL2A_.*_[0-9T]+$", s2_dir, only_dir=True)
+        # contains the paths
+        num_s2_patch_paths = len(s2_patch_paths)
+        log.debug(f"Found {num_s2_patch_paths} S2 patches.")
+        assert num_s2_patch_paths > 0
+
+    # postpone writing until AFTER both dataset files have been assembled.
+    # Otherwise an error in the latter CLI argument could produce an incomplete LMDB
+    env = open_lmdb(target_dir)
+
+    if s1_dir is not None:
+        log.debug("Writing Major TOM Core S1 data into LMDB")
+        lmdb_writer(
+            env,
+            s1_patch_paths,
+            encode_with_parent,
+            major_tom_core_s1_to_safetensor,
+            max_workers=num_workers,
+        )
+
+    if s2_dir is not None:
+        log.debug("Writing Major TOM Core data into LMDB")
+        lmdb_writer(
+            env,
+            s2_patch_paths,
+            encode_with_parent,
+            major_tom_core_s2_to_safetensor,
+            max_workers=num_workers,
+        )
 
 
 @app.command()
@@ -490,6 +650,7 @@ def ssl4eo_s12(
     s1_dir: DatasetDir = None,
     s2_l1c_dir: DatasetDir = None,
     s2_l2a_dir: DatasetDir = None,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
 ):
     """
     [SSL4EO-S12 Sentinel-1, Sentinel-2 L1C, and Sentinel-2 L2A](https://github.com/zhu-xlab/SSL4EO_S12-S12) converter.
@@ -521,6 +682,7 @@ def ssl4eo_s12(
 
     NOTE: We recommend to download the dataset from huggingface, as the download is much more reliable.
     To unpack the data simply run `cat s1*.tar.gz | tar -xzf -`
+    NOTE: `num_workers` defaults to number of available threads.
     """
     log.debug("Will first collect all files and ensure that some patches are found.")
 
@@ -563,22 +725,38 @@ def ssl4eo_s12(
     # For consistency, we do the same for the S1 data
     if s1_dir is not None:
         log.debug("Writing SSL4EO-S12-S1 data into LMDB")
-        lmdb_writer(env, s1_patch_paths, encode_three_levels, ssl4eo_s1_to_safetensor)
+        lmdb_writer(
+            env,
+            s1_patch_paths,
+            encode_three_levels,
+            ssl4eo_s1_to_safetensor,
+            max_workers=num_workers,
+        )
 
     if s2_l1c_dir is not None:
         log.debug("Writing SSL4EO-S12-S2 L1C data into LMDB")
         lmdb_writer(
-            env, s2_l1c_patch_paths, encode_three_levels, ssl4eo_s2_l1c_to_safetensor
+            env,
+            s2_l1c_patch_paths,
+            encode_three_levels,
+            ssl4eo_s2_l1c_to_safetensor,
+            max_workers=num_workers,
         )
 
     if s2_l2a_dir is not None:
         log.debug("Writing SSL4EO-S12-S2 L2A data into LMDB")
         lmdb_writer(
-            env, s2_l2a_patch_paths, encode_three_levels, ssl4eo_s2_l2a_to_safetensor
+            env,
+            s2_l2a_patch_paths,
+            encode_three_levels,
+            ssl4eo_s2_l2a_to_safetensor,
+            max_workers=num_workers,
         )
 
 
-def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
+def lmdb_writer(
+    env, paths, lmdb_key_extractor_func, safetensor_generator, max_workers=None
+):
     """
     A parallel LMDB writer.
     It takes an already opened LMDB `env` as an input and writes batched
@@ -588,6 +766,8 @@ def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
     The data is inserted in a sorted order to ensure stable and repeatable outputs.
     The function will NOT overwrite any data! If data would be overwritten, the program
     halts and exists the program with an error message.
+
+    The number of parallel writers can be controlled via `max_workers`.
     """
     # insertion order is important for reproducibility!
     paths.sort()
@@ -597,7 +777,7 @@ def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
     # Use `spawn` as this is POSIX compliant and will be the default in the future:
     # https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
     with ProcessPoolExecutor(
-        max_workers=None, mp_context=mp.get_context("spawn")
+        max_workers=max_workers, mp_context=mp.get_context("spawn")
     ) as executor:
         # chunk size limits the number of writes per transaction
         # and the maximum number of futures that needs to be processed
@@ -611,13 +791,14 @@ def lmdb_writer(env, paths, lmdb_key_extractor_func, safetensor_generator):
                 # To ensure deterministic output, write in order
                 # i.e., cannot use `as_completed(futures_to_path)` !
                 for future in futures_to_path:
+                    p = futures_to_path[future]
                     if not txn.put(
-                        lmdb_key_extractor_func(futures_to_path[future]),
+                        lmdb_key_extractor_func(p),
                         future.result(),
                         overwrite=False,
                     ):
                         sys.exit(
-                            "Program about to overwriting data in the DB. Stopping execution!"
+                            f"Program about to overwriting data in the DB: with source {str(p)} Stopping execution!"
                         )
 
 

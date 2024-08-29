@@ -105,6 +105,48 @@ def eurosat_ms_root() -> Path:
     return p
 
 
+@pytest.fixture(scope="session")
+def major_tom_core_s1_root() -> Path:
+    str_p = (
+        os.environ.get("RICO_HDL_MAJOR_TOM_CORE_S1_PATH")
+        or "./tiffs/Major-TOM-Core/S1RTC/"
+    )
+    p = Path(str_p)
+    assert p.exists()
+    assert p.is_dir()
+    return p
+
+
+@pytest.fixture(scope="session")
+def major_tom_core_s2_root() -> Path:
+    str_p = (
+        os.environ.get("RICO_HDL_MAJOR_TOM_CORE_S2_PATH")
+        or "./tiffs/Major-TOM-Core/S2L2A/"
+    )
+    p = Path(str_p)
+    assert p.exists()
+    assert p.is_dir()
+    return p
+
+
+@pytest.fixture
+def encoded_major_tom_core_path(
+    major_tom_core_s1_root, major_tom_core_s2_root, tmpdir_factory
+) -> Path:
+    tmp_path = tmpdir_factory.mktemp("lmdb")
+    subprocess.run(
+        [
+            "rico-hdl",
+            "major-tom-core",
+            f"--s1-dir={major_tom_core_s1_root}",
+            f"--s2-dir={major_tom_core_s2_root}",
+            f"--target-dir={tmp_path}",
+        ],
+        check=True,
+    )
+    return Path(tmp_path)
+
+
 # https://docs.pytest.org/en/6.2.x/tmpdir.html#tmpdir-factory-example@pytest.fixture(scope="session")
 @pytest.fixture
 def encoded_bigearthnet_s1_s2_path(
@@ -303,6 +345,78 @@ def test_bigearthnet_integration(
     )
     assert all(
         sample_s2_safetensors_dict[key].shape == (20, 20) for key in ["B01", "B09"]
+    )
+
+
+def test_major_tom_core_integration(
+    major_tom_core_s1_root, major_tom_core_s2_root, encoded_major_tom_core_path
+):
+    env = lmdb.open(str(encoded_major_tom_core_path), readonly=True)
+
+    with env.begin(write=False) as txn:
+        cur = txn.cursor()
+        decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
+
+    assert decoded_lmdb_data.keys() == set(
+        [
+            "0U_199R_S1A_IW_GRDH_1SDV_20220703T043413_20220703T043438_043931_053E87_rtc",
+            "897U_171R_S1B_IW_GRDH_1SDV_20210827T012624_20210827T012653_028425_036437_rtc",
+            "0U_199R_S2A_MSIL2A_20220706T085611_N0400_R007_T33NZA_20220706T153419",
+            "199U_1099R_S2B_MSIL2A_20200223T032739_N9999_R018_T48QUE_20230924T183543",
+        ]
+    )
+
+    sample_s1_safetensors_dict = decoded_lmdb_data.get(
+        "0U_199R_S1A_IW_GRDH_1SDV_20220703T043413_20220703T043438_043931_053E87_rtc",
+    )
+    sample_s2_safetensors_dict = decoded_lmdb_data.get(
+        "0U_199R_S2A_MSIL2A_20220706T085611_N0400_R007_T33NZA_20220706T153419"
+    )
+    safetensors_s1_keys = sample_s1_safetensors_dict.keys()
+    safetensors_s2_keys = sample_s2_safetensors_dict.keys()
+    assert (
+        set(
+            [
+                "B01",
+                "B02",
+                "B03",
+                "B04",
+                "B05",
+                "B06",
+                "B07",
+                "B08",
+                "B8A",
+                "B09",
+                "B11",
+                "B12",
+            ]
+        )
+        == safetensors_s2_keys
+    )
+    assert (
+        set(
+            [
+                "vv",
+                "vh",
+            ]
+        )
+        == safetensors_s1_keys
+    )
+
+    assert all(arr.shape == (1068, 1068) for arr in sample_s1_safetensors_dict.values())
+    assert all(arr.dtype == "float32" for arr in sample_s1_safetensors_dict.values())
+
+    assert all(arr.dtype == "uint16" for arr in sample_s2_safetensors_dict.values())
+    assert all(
+        sample_s2_safetensors_dict[key].shape == (1068, 1068)
+        for key in ["B02", "B03", "B04", "B08"]
+    )
+    assert all(
+        sample_s2_safetensors_dict[key].shape == (534, 534)
+        for key in ["B05", "B06", "B07", "B8A", "B11", "B12"]
+    )
+    assert all(
+        sample_s2_safetensors_dict[key].shape == (178, 178) for key in ["B01", "B09"]
     )
 
 

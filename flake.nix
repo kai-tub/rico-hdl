@@ -67,6 +67,8 @@
           export PATH="$out/bin:$PATH"
           export RICO_HDL_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
           export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
+          export RICO_HDL_MAJOR_TOM_CORE_S1_PATH=${./integration_tests/tiffs/Major-TOM-Core/S1RTC}
+          export RICO_HDL_MAJOR_TOM_CORE_S2_PATH=${./integration_tests/tiffs/Major-TOM-Core/S2L2A}
           export RICO_HDL_SSL4EO_S12_S1_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s1
           export RICO_HDL_SSL4EO_S12_S2_L1C_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s2c
           export RICO_HDL_SSL4EO_S12_S2_L2A_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s2a
@@ -142,6 +144,8 @@
             env.RICO_HDL_SSL4EO_S12_S1_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/SSL4EO-S12/s1";
             env.RICO_HDL_SSL4EO_S12_S2_L1C_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/SSL4EO-S12/s2c";
             env.RICO_HDL_SSL4EO_S12_S2_L2A_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/SSL4EO-S12/s2a";
+            env.RICO_HDL_MAJOR_TOM_CORE_S1_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/Major-TOM-Core/S1RTC/";
+            env.RICO_HDL_MAJOR_TOM_CORE_S2_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/Major-TOM-Core/S2L2A/";
             packages =
               [
                 (mkPoetryEnv

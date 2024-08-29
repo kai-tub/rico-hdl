@@ -39,20 +39,21 @@ To run the application on any x86-64 Linux server, we recommend to use the `AppI
 The docker image can be used to run it on other operating systems:
 - [ghcr.io/kai-tub/rico-hdl:latest](https://github.com/kai-tub/rico-hdl/pkgs/container/rico-hdl)
 
-### Supported Remote Sensing Datasets
+## Supported Remote Sensing Datasets
 
 Currently, `rico-hdl` supports:
-- [BigEarthNet-S1 v2.0][ben]
-- [BigEarthNet-S2 v2.0][ben]
-- [BigEarthNet-MM v2.0][ben]
-- [HySpecNet-11k][hyspecnet]
-- [UC Merced Land Use][ucmerced]
-- [EuroSAT][euro]
-- [SSL4EO-S12][ssl4eo-s12]
+- [BigEarthNet-S1 v2.0](#bigearthnet-example)
+- [BigEarthNet-S2 v2.0](#bigearthnet-example)
+- [BigEarthNet-MM v2.0](#bigearthnet-example)
+- [HySpecNet-11k](#hyspecnet-11k-example)
+- [UC Merced Land Use](#uc-merced-land-use-example)
+- [EuroSAT](#eurosat-example)
+- [SSL4EO-S12](#ssl4eo-s12-example)
+- [Major-Tom-Core](#major-tom-core-example)
 
 Additional datasets will be added in the near future.
 
-## [BigEarthNet][ben] Example
+### [BigEarthNet][ben] Example
 
 First, [download the rico-hdl](#Download) binary and install
 the Python [lmdb][pyl] and [saftensors][pys] packages.
@@ -478,7 +479,7 @@ tensor = np.stack([safetensor_dict[key] for key in [
 assert tensor.shape == (13, 64, 64)
 ```
 
-## [SSL4EO-S12][ssl4eo-s12] Example
+### [SSL4EO-S12][ssl4eo-s12] Example
 
 First, [download the rico-hdl](#Download) binary and install
 the Python [lmdb][pyl] and [saftensors][pys] packages.
@@ -683,6 +684,116 @@ rgb_tensor = np.stack([safetensor_dict[b] for b in rgb_bands])
 assert rgb_tensor.shape == (3, 264, 264)
 ```
 
+## [Major-TOM-Core][major-tom] Example
+
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
+Then, to convert the Sentinel-1 and Sentinel-2 patches from the [Major-TOM-Core][major-tom]
+dataset into the optimized format, call the application with:
+
+```bash
+rico-hdl major-tom-core --s1-dir <S1_ROOT_DIR> --s2-dir <S2_ROOT_DIR> --target-dir encoded-major-tom
+```
+
+In Major-TOM-Core, each band is stored as a separate file with the associate band as the name (`B01.tif`, `B12.tif`, `vv.tif`, ...).
+The directory that contains the bands is the associated product id/patch and
+is uniquely identifiable if it is combined with the associated grid cell id (parent directory).
+The encoder groups all unique patches (`<grid_cell>_<product_id>`) and stores the data as a [safetensors][s] dictionary,
+where the dictionary's key is the band name (`B01`, `B12`, `vv`, ...).
+
+> [!NOTE]
+> The encoder will _not_ encode the `thumbnail.png` nor the `cloud_mask.tif` band!
+
+<details>
+  <summary>Example Input</summary>
+
+```
+├── <S1_ROOT_DIR>
+│  └── 897U
+│     └── 897U_171R
+│        └── S1B_IW_GRDH_1SDV_20210827T012624_20210827T012653_028425_036437_rtc
+│           ├── thumbnail.png
+│           ├── vh.tif
+│           └── vv.tif
+└── <S2_ROOT_DIR>
+   └── 199U
+      └── 199U_1099R
+         └── S2B_MSIL2A_20200223T032739_N9999_R018_T48QUE_20230924T183543
+            ├── B01.tif
+            ├── B02.tif
+            ├── B03.tif
+            ├── B04.tif
+            ├── B05.tif
+            ├── B06.tif
+            ├── B07.tif
+            ├── B08.tif
+            ├── B09.tif
+            ├── B8A.tif
+            ├── B11.tif
+            ├── B12.tif
+            ├── cloud_mask.tif
+            └── thumbnail.png
+```
+
+</details>
+
+<details>
+  <summary>LMDB Result</summary>
+
+```
+'897U_171R_S1B_IW_GRDH_1SDV_20210827T012624_20210827T012653_028425_036437_rtc':
+  {
+    'vh': <1068x1068 float32 safetensors image data>
+    'vv': <1068x1068 float32 safetensors image data>
+  },
+'199U_1099R_S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP':
+  {
+    'B01': <178x178   uint16 safetensors image data>,
+    'B02': <1068x1068 uint16 safetensors image data>,
+    'B03': <1068x1068 uint16 safetensors image data>,
+    'B04': <1068x1068 uint16 safetensors image data>,
+    'B05': <534x534   uint16 safetensors image data>,
+    'B06': <534x534   uint16 safetensors image data>,
+    'B07': <534x534   uint16 safetensors image data>,
+    'B08': <1068x1068 uint16 safetensors image data>,
+    'B8A': <534x534   uint16 safetensors image data>,
+    'B09': <178x178   uint16 safetensors image data>,
+    'B11': <534x534   uint16 safetensors image data>,
+    'B12': <534x534   uint16 safetensors image data>,
+  }
+```
+
+</details>
+
+The following code shows how to access the converted database:
+
+```python
+import lmdb
+# import desired deep-learning library:
+# numpy, torch, tensorflow, paddle, flax, mlx
+from safetensors.numpy import load
+from pathlib import Path
+
+# path to the encoded dataset/output of rico-hdl
+encoded_path = Path("./encoded-major-tom")
+
+# Make sure to only open the environment once
+# and not everytime an item is accessed.
+env = lmdb.open(str(encoded_path), readonly=True)
+
+with env.begin() as txn:
+  # string encoding is required to map the string to an LMDB key
+  safetensor_dict = load(txn.get("199U_1099R_S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP".encode()))
+
+rgb_bands = ["B04", "B03", "B02"]
+rgb_tensor = np.stack([safetensor_dict[b] for b in rgb_bands])
+assert rgb_tensor.shape == (3, 1068, 1068)
+```
+
+
+> [!TIP]
+> Remember to use the appropriate `load` function for a given deep-learning library.
+
 
 ## Design
 
@@ -747,3 +858,4 @@ If you use this work, please cite:
 [ucmerced]: http://weegee.vision.ucmerced.edu/datasets/landuse.html
 [euro]: https://zenodo.org/records/7711810
 [ssl4eo-s12]: https://github.com/zhu-xlab/SSL4EO-S12
+[major-tom]: https://github.com/ESA-PhiLab/Major-TOM

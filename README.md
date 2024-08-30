@@ -740,6 +740,15 @@ where the dictionary's key is the band name (`B01`, `B12`, `vv`, ...).
 <details>
   <summary>LMDB Result</summary>
 
+Note: We merge the patch directory with the parent directories.
+This path merging ensures that values are unique.
+
+And the authors of Major-Tom-Core did not ensure that the resulting patches have
+a consistent size! There are some patches that have a different size, like
+`195D_241R/S1B_IW_GRDH_1SDV_20200419T165643_20200419T165708_021215_028426_rtc/vv.tif`
+with a pixel size of `(1424, 1424) instead of (1068, 1424)` and where each pixel is
+`7.5x7.5 m` instead of `10x10 m` (most likely the patch has been accidentally interpolated).
+
 ```
 '897U_171R_S1B_IW_GRDH_1SDV_20210827T012624_20210827T012653_028425_036437_rtc':
   {

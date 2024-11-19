@@ -50,6 +50,7 @@ Currently, `rico-hdl` supports:
 - [EuroSAT](#eurosat-example)
 - [SSL4EO-S12](#ssl4eo-s12-example)
 - [Major-Tom-Core](#major-tom-core-example)
+- [Hydro](#hydro)
 
 Additional datasets will be added in the near future.
 
@@ -803,6 +804,109 @@ assert rgb_tensor.shape == (3, 1068, 1068)
 > [!TIP]
 > Remember to use the appropriate `load` function for a given deep-learning library.
 
+### [Hydro][hydro] Example
+
+First, [download the rico-hdl](#Download) binary and install
+the Python [lmdb][pyl] and [saftensors][pys] packages.
+Then, to convert the patches from the [Hydro][hydro]
+dataset into the optimized format, call the application with:
+
+```bash
+rico-hdl hydro --dataset-dir <HYDRO_ROOT_DIR> --dataset-dir Encoded-Hydro
+```
+
+In [Hydro][hydro], each patch contains 12 bands.
+The encoder will convert each patch into a [safetensors][s]
+dictionary, where each key is the band name (`B01`, `B02`, ... `B8A`, `B09`, `B11`, `B12`)
+of the safetensors dictionary.
+
+<details>
+  <summary>Example Input</summary>
+
+```
+Hydro
+├── patch_0.tif
+└── patch_1.tif
+```
+</details>
+
+<details>
+  <summary>LMDB Result</summary>
+
+```
+'patch_0':
+  {
+    'B01': <256x256 uint16 safetensors image data>,
+    'B02': <256x256 uint16 safetensors image data>,
+    'B03': <256x256 uint16 safetensors image data>,
+    'B04': <256x256 uint16 safetensors image data>,
+    'B05': <256x256 uint16 safetensors image data>,
+    'B06': <256x256 uint16 safetensors image data>,
+    'B07': <256x256 uint16 safetensors image data>,
+    'B08': <256x256 uint16 safetensors image data>,
+    'B8A': <256x256 uint16 safetensors image data>,
+    'B09': <256x256 uint16 safetensors image data>,
+    'B11': <256x256 uint16 safetensors image data>,
+    'B12': <256x256 uint16 safetensors image data>,
+  },
+'patch_1':
+  {
+    'B01': <256x256 uint16 safetensors image data>,
+    'B02': <256x256 uint16 safetensors image data>,
+    'B03': <256x256 uint16 safetensors image data>,
+    'B04': <256x256 uint16 safetensors image data>,
+    'B05': <256x256 uint16 safetensors image data>,
+    'B06': <256x256 uint16 safetensors image data>,
+    'B07': <256x256 uint16 safetensors image data>,
+    'B08': <256x256 uint16 safetensors image data>,
+    'B8A': <256x256 uint16 safetensors image data>,
+    'B09': <256x256 uint16 safetensors image data>,
+    'B11': <256x256 uint16 safetensors image data>,
+    'B12': <256x256 uint16 safetensors image data>,
+  },
+```
+
+</details>
+
+```python
+import lmdb
+import numpy as np
+# import desired deep-learning library:
+# numpy, torch, tensorflow, paddle, flax, mlx
+from safetensors.numpy import load
+from pathlib import Path
+
+encoded_path = "Encoded-Hydro"
+
+# Make sure to only open the environment once
+# and not everytime an item is accessed.
+env = lmdb.open(str(encoded_path), readonly=True)
+
+with env.begin() as txn:
+  # string encoding is required to map the string to an LMDB key
+  safetensor_dict = load(txn.get("patch_0".encode()))
+
+tensor = np.stack(
+  [
+    safetensor_dict[key]
+    for key in [
+      "B01",
+      "B02",
+      "B03",
+      "B04",
+      "B05",
+      "B06",
+      "B07",
+      "B08",
+      "B8A",
+      "B09",
+      "B11",
+      "B12",
+    ]
+  ]
+)
+assert tensor.shape == (12, 256, 256)
+```
 
 ## Design
 

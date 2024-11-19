@@ -97,6 +97,15 @@ def uc_merced_root() -> Path:
 
 
 @pytest.fixture(scope="session")
+def hydro_root() -> Path:
+    str_p = os.environ.get("RICO_HDL_HYDRO_PATH") or "./tiffs/Hydro/"
+    p = Path(str_p)
+    assert p.exists()
+    assert p.is_dir()
+    return p
+
+
+@pytest.fixture(scope="session")
 def eurosat_ms_root() -> Path:
     str_p = os.environ.get("RICO_HDL_EUROSAT_MS_PATH") or "./tiffs/EUROSAT_MS/"
     p = Path(str_p)
@@ -208,6 +217,21 @@ def encoded_uc_merced_path(uc_merced_root, tmpdir_factory) -> Path:
             "rico-hdl",
             "uc-merced",
             f"--dataset-dir={uc_merced_root}",
+            f"--target-dir={tmp_path}",
+        ],
+        check=True,
+    )
+    return Path(tmp_path)
+
+
+@pytest.fixture
+def encoded_hydro_path(hydro_root, tmpdir_factory) -> Path:
+    tmp_path = tmpdir_factory.mktemp("hydro_lmdb")
+    subprocess.run(
+        [
+            "rico-hdl",
+            "hydro",
+            f"--dataset-dir={hydro_root}",
             f"--target-dir={tmp_path}",
         ],
         check=True,
@@ -590,9 +614,54 @@ def test_uc_merced_integration(uc_merced_root, encoded_uc_merced_path):
     sample_safetensors_dict = decoded_lmdb_data.get("airplane00")
     safetensors_keys = sample_safetensors_dict.keys()
     assert set(["Red", "Green", "Blue"]) == safetensors_keys
-
     assert all(arr.shape == (256, 256) for arr in sample_safetensors_dict.values())
     assert all(arr.dtype == "uint8" for arr in sample_safetensors_dict.values())
+
+
+def test_hydro_integration(hydro_root, encoded_hydro_path):
+    env = lmdb.open(str(encoded_hydro_path), readonly=True)
+
+    with env.begin(write=False) as txn:
+        cur = txn.cursor()
+        decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
+
+    lmdb_keys = decoded_lmdb_data.keys()
+    assert lmdb_keys == set(
+        [
+            "patch_0",
+            "patch_1",
+            "patch_10",
+            "patch_100",
+            "patch_1000",
+            "patch_10000",
+            "patch_100000",
+        ]
+    )
+
+    sample_safetensors_dict = decoded_lmdb_data.get("patch_0")
+    safetensors_keys = sample_safetensors_dict.keys()
+    assert (
+        set(
+            [
+                "B01",
+                "B02",
+                "B03",
+                "B04",
+                "B05",
+                "B06",
+                "B07",
+                "B08",
+                "B8A",
+                "B09",
+                "B11",
+                "B12",
+            ]
+        )
+        == safetensors_keys
+    )
+
+    assert all(arr.shape == (256, 256) for arr in sample_safetensors_dict.values())
+    assert all(arr.dtype == "uint16" for arr in sample_safetensors_dict.values())
 
 
 def test_eurosat_integration(eurosat_ms_root, encoded_eurosat_ms_path):

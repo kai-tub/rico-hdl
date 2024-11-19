@@ -114,6 +114,21 @@ NUM_HYSPECNET_BANDS = 224
 # see output of `gdalinfo`
 UC_MERCED_BAND_IDX_COLOR_MAPPING = {1: "Red", 2: "Green", 3: "Blue"}
 
+HYDRO_BAND_IDX_BAND_MAPPING = {
+    1: "B01",
+    2: "B02",
+    3: "B03",
+    4: "B04",
+    5: "B05",
+    6: "B06",
+    7: "B07",
+    8: "B08",
+    9: "B8A",
+    10: "B09",
+    11: "B11",
+    12: "B12",
+}
+
 GENERAL_HELP_TEXT = """\
 This CLI tool is a fast and easy-to-use *r*emote sensing *i*mage format *co*nverter
 for *h*igh-throughput *d*eep-*l*earning (rico-hdl).
@@ -310,10 +325,6 @@ def uc_merced(
     # For such a small dataset, it would be interesting to know if this extra stacking
     # costs a lot of time.
     log.info(f"Searching for patches in: {dataset_dir}")
-    # this could match the file paths directly
-    # the lmdb key would be the name itself without SPECTRAL_IMAGE.TIF
-    # and the safetensor would be produced from this file
-    # Remember: hyspecnet has multiple bands per file!
     patch_paths = fast_find(r".*\d\d\.tif$", dataset_dir, only_dir=False)
     num_patch_paths = len(patch_paths)
     log.debug(f"Found {num_patch_paths} patches.")
@@ -322,6 +333,48 @@ def uc_merced(
     log.debug("Writing UC Merced data into LMDB")
     lmdb_writer(
         env, patch_paths, encode_stem, uc_merced_to_safetensor, max_workers=num_workers
+    )
+
+
+@app.command()
+def hydro(
+    target_dir: TargetDir,
+    dataset_dir: DatasetDir,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
+):
+    """
+    [Hydro -- A Foundation Model for Water in Sattelite Imagery](https://github.com/isaaccorley/hydro-foundation-model/tree/main) converter.
+
+    The LMDB keys will be the names of the Hydro patches without the `.tif` suffix.
+
+    The `safetensor` keys are the indexes from the tiff file mapped to the Sentinel-2
+    Band value.
+
+
+    References:
+    - Publication: <https://github.com/isaaccorley/hydro-foundation-model/tree/main>
+    - Dataset: <https://huggingface.co/datasets/isaaccorley/Hydro/tree/main>
+    - Mapping source: <https://github.com/isaaccorley/hydro-foundation-model/issues/4>
+
+
+    NOTE: `num_workers` defaults to number of available threads.
+    """
+    log.info(f"Searching for patches in: {dataset_dir}")
+    # the lmdb key will be the name itself without .tif suffix
+    # and the safetensor would be produced from this file
+    # Remember: Hydro has multiple bands per file!
+    patch_paths = fast_find(r"patch_\d+.tif$", dataset_dir, only_dir=False)
+    num_patch_paths = len(patch_paths)
+    log.debug(f"Found {num_patch_paths} patches.")
+    assert num_patch_paths > 0
+    env = open_lmdb(target_dir)
+    log.debug("Writing Hydro data into LMDB")
+    lmdb_writer(
+        env,
+        patch_paths,
+        encode_stem,
+        hydro_to_safetensor,
+        max_workers=num_workers,
     )
 
 
@@ -351,9 +404,6 @@ def eurosat_multi_spectral(
     """
     log.info(f"Searching for patches in: {dataset_dir}")
     # this could match the file paths directly
-    # the lmdb key would be the name itself without SPECTRAL_IMAGE.TIF
-    # and the safetensor would be produced from this file
-    # Remember: hyspecnet has multiple bands per file!
     patch_paths = fast_find(r".*\d+\.tif$", dataset_dir, only_dir=False)
     num_patch_paths = len(patch_paths)
     log.debug(f"Found {num_patch_paths} patches.")
@@ -459,6 +509,21 @@ def uc_merced_to_safetensor(patch_path: str) -> bytes:
     data = {
         color: read_single_band_raster(p, index=idx, is_georeferenced=False)
         for idx, color in UC_MERCED_BAND_IDX_COLOR_MAPPING.items()
+    }
+
+    return save(data, metadata=None)
+
+
+def hydro_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a Hydro patch file (`.tif` file),
+    read the individual bands and write them as entries
+    into a serialized safetensor dictionary.
+    """
+    p = Path(patch_path)
+    data = {
+        band: read_single_band_raster(p, index=idx, is_georeferenced=False)
+        for idx, band in HYDRO_BAND_IDX_BAND_MAPPING.items()
     }
 
     return save(data, metadata=None)

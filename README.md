@@ -972,3 +972,4 @@ If you use this work, please cite:
 [euro]: https://zenodo.org/records/7711810
 [ssl4eo-s12]: https://github.com/zhu-xlab/SSL4EO-S12
 [major-tom]: https://github.com/ESA-PhiLab/Major-TOM
+[hydro]: https://github.com/isaaccorley/hydro-foundation-model/tree/main

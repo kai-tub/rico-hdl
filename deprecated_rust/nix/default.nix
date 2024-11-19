@@ -15,7 +15,11 @@ rustPlatform.buildRustPackage {
 
   src = nix-filter {
     root = ../.;
-    include = ["src" "Cargo.lock" "Cargo.toml"];
+    include = [
+      "src"
+      "Cargo.lock"
+      "Cargo.toml"
+    ];
   };
   # cargoLock.lockFile = ../Cargo.lock;
   # https://github.com/NixOS/nixpkgs/pull/113176
@@ -31,17 +35,14 @@ rustPlatform.buildRustPackage {
     gdalMinimal
   ];
   BINDGEN_EXTRA_CLANG_ARGS = [
-    ''
-      -I"${llvmPackages_latest.libclang.lib}/lib/clang/${llvmPackages_latest.libclang.version}/include"''
+    ''-I"${llvmPackages_latest.libclang.lib}/lib/clang/${llvmPackages_latest.libclang.version}/include"''
   ];
-  LIBCLANG_PATH =
-    lib.makeLibraryPath
-    [llvmPackages_latest.libclang.lib];
+  LIBCLANG_PATH = lib.makeLibraryPath [ llvmPackages_latest.libclang.lib ];
   meta = {
     description = "A deep-learning tensor encoder tool for remote sensing datasets.";
     homepage = "https://github.com/kai-tub/rico-hdl";
     license = lib.licenses.mit;
-    maintainers = with lib.maintainers; [kai-tub];
+    maintainers = with lib.maintainers; [ kai-tub ];
     mainProgram = "rico-hdl";
   };
 }

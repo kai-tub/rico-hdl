@@ -81,6 +81,7 @@
               export PATH="$out/bin:$PATH"
               export RICO_HDL_S1_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S1}
               export RICO_HDL_S2_PATH=${./integration_tests/tiffs/BigEarthNet/BigEarthNet-S2}
+              export RICO_HDL_REFERENCE_MAPS_PATH=${./integration_tests/tiffs/BigEarthNet/Reference_Maps}
               export RICO_HDL_MAJOR_TOM_CORE_S1_PATH=${./integration_tests/tiffs/Major-TOM-Core/S1RTC}
               export RICO_HDL_MAJOR_TOM_CORE_S2_PATH=${./integration_tests/tiffs/Major-TOM-Core/S2L2A}
               export RICO_HDL_SSL4EO_S12_S1_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s1
@@ -157,6 +158,7 @@
                   env.RICO_HDL_HYDRO_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/Hydro/";
                   env.RICO_HDL_EUROSAT_MS_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/EuroSAT_MS";
                   env.RICO_HDL_S1_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/BigEarthNet/BigEarthNet-S1";
+                  env.RICO_HDL_REFERENCE_MAPS_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/BigEarthNet/Reference_Maps";
                   env.RICO_HDL_LMDB_REF_DATA_PATH = "${config.env.DEVENV_ROOT}/integration_tests/BigEarthNet_LMDB";
                   env.RICO_HDL_S2_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/BigEarthNet/BigEarthNet-S2";
                   env.RICO_HDL_LMDB_REF_PATH = "${config.env.DEVENV_ROOT}/integration_tests/BigEarthNet_LMDB";

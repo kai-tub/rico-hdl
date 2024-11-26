@@ -45,6 +45,7 @@ Currently, `rico-hdl` supports:
 - [BigEarthNet-S1 v2.0](#bigearthnet-example)
 - [BigEarthNet-S2 v2.0](#bigearthnet-example)
 - [BigEarthNet-MM v2.0](#bigearthnet-example)
+- [BigEarthNet-Reference-Maps v2.0](#bigearthnet-example)
 - [HySpecNet-11k](#hyspecnet-11k-example)
 - [UC Merced Land Use](#uc-merced-land-use-example)
 - [EuroSAT](#eurosat-example)
@@ -62,12 +63,14 @@ Then, to convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.
 dataset into the optimized format, call the application with:
 
 ```bash
-rico-hdl bigearthnet --bigearthnet-s1-dir <S1_ROOT_DIR> --bigearthnet-s2-dir <S2_ROOT_DIR> --target-dir Encoded-BigEarthNet
+rico-hdl bigearthnet --bigearthnet-s1-dir <S1_ROOT_DIR> --bigearthnet-s2-dir <S2_ROOT_DIR> --bigearthnet-reference-maps <REREFERENCE_MAPS_DIR> --target-dir Encoded-BigEarthNet
 ```
 
-In BigEarthNet, each band is stored as a separate file with the associate band as a suffix (`_B01`, `_B12`, `_VV`, ...).
+In BigEarthNet, for each patch each band is stored as a separate file with the associate band as a suffix (`_B01`, `_B12`, `_VV`, ...).
+The reference maps are stored as TIFF files with a `_reference_maps` suffix.
 The encoder groups all image files with the same name/prefix and stores the data as a [safetensors][s] dictionary,
-where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
+where the `safetensors` dictionary's key is the band name (`B01`, `B12`, `VV`, ...) for the patches
+and `Reference_Map` for the single-band reference maps.
 
 <details>
   <summary>Example Input</summary>
@@ -78,21 +81,25 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
 │     └── S1A_IW_GRDH_1SDV_20170613T165043_33UUP_70_48
 │        ├── S1A_IW_GRDH_1SDV_20170613T165043_33UUP_70_48_VH.tif
 │        └── S1A_IW_GRDH_1SDV_20170613T165043_33UUP_70_48_VV.tif
-└── <S2_ROOT_DIR>
-   └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP
-      └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B01.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B02.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B03.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B04.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B05.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B06.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B07.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B08.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B09.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B8A.tif
-         ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B11.tif
-         └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B12.tif
+├── <S2_ROOT_DIR>
+│   └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP
+│       └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B01.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B02.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B03.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B04.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B05.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B06.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B07.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B08.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B09.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B8A.tif
+│           ├── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B11.tif
+│           └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43_B12.tif
+└── Reference_Maps
+    └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP
+        └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_26_57
+            └── S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_26_57_reference_map.tif
 ```
 
 </details>
@@ -106,7 +113,7 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
     'VH': <120x120 float32 safetensors image data>
     'VV': <120x120 float32 safetensors image data>
   },
-'S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP':
+'S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43':
   {
     'B01': <30x30   uint16 safetensors image data>,
     'B02': <120x120 uint16 safetensors image data>,
@@ -120,6 +127,10 @@ where the dictionary's key is the band name (`B01`, `B12`, `VV`, ...).
     'B09': <30x30   uint16 safetensors image data>,
     'B11': <60x60   uint16 safetensors image data>,
     'B12': <60x60   uint16 safetensors image data>,
+  }
+'S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_26_57_reference_map':
+  {
+    'Data': <120x120 uint16 safetensors image data>,
   }
 ```
 

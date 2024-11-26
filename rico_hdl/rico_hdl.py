@@ -268,6 +268,18 @@ def bigearthnet_s2_to_safetensor(patch_path: str) -> bytes:
     return save(data, metadata=None)
 
 
+def bigearthnet_reference_map_to_safetensor(reference_map_path: str) -> bytes:
+    """
+    Given the path to a BigEarthNet-Reference-Map TIFF file
+    (NOT the parent directory), read the single band
+    and convert it into a serialized safetensor dictionary with the key
+    `Data`.
+    """
+    p = Path(reference_map_path)
+    data = {"Data": read_single_band_raster(p)}
+    return save(data, metadata=None)
+
+
 def major_tom_core_s1_to_safetensor(patch_path: str) -> bytes:
     """
     Given the path to a Major TOM Core S1 patch directory
@@ -584,19 +596,27 @@ def bigearthnet(
     target_dir: TargetDir,
     bigearthnet_s1_dir: DatasetDir = None,
     bigearthnet_s2_dir: DatasetDir = None,
+    bigearthnet_reference_maps_dir: DatasetDir = None,
     num_workers: Annotated[int, typer.Option(min=1)] = None,
 ):
     """
-    [BigEarthNet-S1 and BigEarthNet-S2](https://doi.org/10.5281/zenodo.10891137) converter.
+    [BigEarthNet-S1, BigEarthNet-S2, and BigEarthNet-Reference-Maps](https://doi.org/10.5281/zenodo.10891137) converter.
 
-    If both source directories are given, both of them will be written to the same LMDB file.
-    The LMDB keys will be the names of the BigEarthNet-S1/S2 patches (i.e., no `_BXY.tif` suffix).
+    If all three source directories are given, all three of them will be written to the same LMDB file.
+    The LMDB keys will be the names of the BigEarthNet-S1/S2 patches patches (i.e., no `_BXY.tif` suffix)
+    or Reference Maps (_includes_ the `_reference_map` suffix).
+
     The `safetensors` keys relate to the associate band (for example: `B01`, `B8A`, `B12`, `VV`).
+    For the single band Reference-Maps, the `safetensor` key is `Data`.
 
     NOTE: `num_workers` defaults to number of available threads.
     """
     log.debug("Will first collect all files and ensure that some patches are found.")
-    if (bigearthnet_s1_dir is None) and (bigearthnet_s2_dir is None):
+    if (
+        (bigearthnet_s1_dir is None)
+        and (bigearthnet_s2_dir is None)
+        and (bigearthnet_reference_maps_dir is None)
+    ):
         log.error("Please provide at least one directory path")
         exit(-1, "No source directory is specified")
 
@@ -610,8 +630,7 @@ def bigearthnet(
         assert num_s1_patch_paths > 0
 
     if bigearthnet_s2_dir is not None:
-        log.info(f"Seaching for patches in: {bigearthnet_s2_dir}")
-
+        log.info(f"Searching for patches in: {bigearthnet_s2_dir}")
         s2_patch_paths = fast_find(
             r"S2[AB]_MSIL2A_.*_\d+_\d+$", bigearthnet_s2_dir, only_dir=True
         )
@@ -619,6 +638,18 @@ def bigearthnet(
         num_s2_patch_paths = len(s2_patch_paths)
         log.debug(f"Found {num_s2_patch_paths} S2 patches.")
         assert num_s2_patch_paths > 0
+
+    if bigearthnet_reference_maps_dir is not None:
+        log.info(f"Searching for reference maps in: {bigearthnet_reference_maps_dir}")
+        reference_maps_paths = fast_find(
+            r"S2[AB]_MSIL2A_.*_\d+_\d+_reference_map.tif$",
+            bigearthnet_reference_maps_dir,
+            only_dir=False,
+        )
+        # contains the paths
+        num_reference_maps_paths = len(reference_maps_paths)
+        log.debug(f"Found {num_reference_maps_paths} reference maps.")
+        assert num_reference_maps_paths > 0
 
     # postpone writing until AFTER both dataset files have been assembled.
     # Otherwise an error in the latter CLI argument could produce an incomplete LMDB
@@ -641,6 +672,16 @@ def bigearthnet(
             s2_patch_paths,
             encode_stem,
             bigearthnet_s2_to_safetensor,
+            max_workers=num_workers,
+        )
+
+    if bigearthnet_reference_maps_dir is not None:
+        log.debug("Writing Reference Maps data into LMDB")
+        lmdb_writer(
+            env,
+            reference_maps_paths,
+            encode_stem,
+            bigearthnet_reference_map_to_safetensor,
             max_workers=num_workers,
         )
 

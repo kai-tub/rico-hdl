@@ -39,6 +39,18 @@ def bigearthnet_s2_root() -> Path:
 
 
 @pytest.fixture(scope="session")
+def bigearthnet_reference_maps_root() -> Path:
+    str_p = (
+        os.environ.get("RICO_HDL_REFERENCE_MAPS_PATH")
+        or "./tiffs/BigEarthNet/Reference_Maps/"
+    )
+    p = Path(str_p)
+    assert p.exists()
+    assert p.is_dir()
+    return p
+
+
+@pytest.fixture(scope="session")
 def bigearthnet_lmdb_ref_path() -> Path:
     str_p = os.environ.get("RICO_HDL_LMDB_REF_PATH") or "./BigEarthNet_LMDB/"
     p = Path(str_p)
@@ -176,6 +188,28 @@ def encoded_bigearthnet_s1_s2_path(
 
 
 @pytest.fixture
+def encoded_bigearthnet_s1_s2_reference_maps_path(
+    bigearthnet_s1_root,
+    bigearthnet_s2_root,
+    bigearthnet_reference_maps_root,
+    tmpdir_factory,
+) -> Path:
+    tmp_path = tmpdir_factory.mktemp("lmdb")
+    subprocess.run(
+        [
+            "rico-hdl",
+            "bigearthnet",
+            f"--bigearthnet-s1-dir={bigearthnet_s1_root}",
+            f"--bigearthnet-s2-dir={bigearthnet_s2_root}",
+            f"--bigearthnet-reference-maps-dir={bigearthnet_reference_maps_root}",
+            f"--target-dir={tmp_path}",
+        ],
+        check=True,
+    )
+    return Path(tmp_path)
+
+
+@pytest.fixture
 def encoded_ssl4eo_s12_path(
     ssl4eo_s12_s1_root, ssl4eo_s12_s2_l1c_root, ssl4eo_s12_s2_l2a_root, tmpdir_factory
 ) -> Path:
@@ -254,6 +288,8 @@ def encoded_eurosat_ms_path(eurosat_ms_root, tmpdir_factory) -> Path:
     return Path(tmp_path)
 
 
+# Only uses S1/S2 as the Reference Maps encoder
+# was added later and might get a name change in the future!
 def test_reproducibility_and_data_consistency(
     bigearthnet_s1_root,
     bigearthnet_s2_root,
@@ -303,9 +339,9 @@ def test_reproducibility_and_data_consistency(
 def test_bigearthnet_integration(
     bigearthnet_s1_root,
     bigearthnet_s2_root,
-    encoded_bigearthnet_s1_s2_path,
+    encoded_bigearthnet_s1_s2_reference_maps_path,
 ):
-    env = lmdb.open(str(encoded_bigearthnet_s1_s2_path), readonly=True)
+    env = lmdb.open(str(encoded_bigearthnet_s1_s2_reference_maps_path), readonly=True)
 
     with env.begin(write=False) as txn:
         cur = txn.cursor()
@@ -315,6 +351,7 @@ def test_bigearthnet_integration(
         [
             "S1A_IW_GRDH_1SDV_20170613T165043_33UUP_70_48",
             "S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43",
+            "S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_26_57_reference_map",
         ]
     )
 
@@ -324,8 +361,12 @@ def test_bigearthnet_integration(
     sample_s2_safetensors_dict = decoded_lmdb_data.get(
         "S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_75_43"
     )
+    sample_reference_map_safetensors_dict = decoded_lmdb_data.get(
+        "S2A_MSIL2A_20170613T101031_N9999_R022_T33UUP_26_57_reference_map"
+    )
     safetensors_s1_keys = sample_s1_safetensors_dict.keys()
     safetensors_s2_keys = sample_s2_safetensors_dict.keys()
+    safetensors_reference_map_keys = sample_reference_map_safetensors_dict.keys()
     assert (
         set(
             [
@@ -354,9 +395,18 @@ def test_bigearthnet_integration(
         )
         == safetensors_s1_keys
     )
+    assert set(["Data"]) == safetensors_reference_map_keys
 
     assert all(arr.shape == (120, 120) for arr in sample_s1_safetensors_dict.values())
     assert all(arr.dtype == "float32" for arr in sample_s1_safetensors_dict.values())
+
+    assert all(
+        arr.shape == (120, 120)
+        for arr in sample_reference_map_safetensors_dict.values()
+    )
+    assert all(
+        arr.dtype == "uint16" for arr in sample_reference_map_safetensors_dict.values()
+    )
 
     assert all(arr.dtype == "uint16" for arr in sample_s2_safetensors_dict.values())
     assert all(

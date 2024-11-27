@@ -59,7 +59,7 @@ Additional datasets will be added in the near future.
 
 First, [download the rico-hdl](#Download) binary and install
 the Python [lmdb][pyl] and [saftensors][pys] packages.
-Then, to convert the Sentinel-1 and Sentinel-2 patches from the [BigEarthNet v2.0][ben]
+Then, to convert the Sentinel-1 and Sentinel-2 patches and the Reference Maps from the [BigEarthNet v2.0][ben]
 dataset into the optimized format, call the application with:
 
 ```bash
@@ -70,7 +70,7 @@ In BigEarthNet, for each patch each band is stored as a separate file with the a
 The reference maps are stored as TIFF files with a `_reference_maps` suffix.
 The encoder groups all image files with the same name/prefix and stores the data as a [safetensors][s] dictionary,
 where the `safetensors` dictionary's key is the band name (`B01`, `B12`, `VV`, ...) for the patches
-and `Reference_Map` for the single-band reference maps.
+and `Data` for the single-band reference maps.
 
 <details>
   <summary>Example Input</summary>

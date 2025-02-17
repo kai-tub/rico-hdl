@@ -111,6 +111,7 @@ MAJOR_TOM_S2_ORDERING = [
 ]
 
 NUM_HYSPECNET_BANDS = 224
+NUM_SPECTRAL_EARTH_BANDS = 202
 # see output of `gdalinfo`
 UC_MERCED_BAND_IDX_COLOR_MAPPING = {1: "Red", 2: "Green", 3: "Blue"}
 
@@ -429,6 +430,37 @@ def eurosat_multi_spectral(
 
 
 @app.command()
+def spectral_earth_enmap(
+    target_dir: TargetDir,
+    dataset_dir: DatasetDir,
+    num_workers: Annotated[int, typer.Option(min=1)] = None,
+):
+    """
+    [EnMAP HSI - SpectralEarth](https://geoservice.dlr.de/web/datasets/enmap_spectralearth)
+
+    Provide the path to the `spectral_earth/enmap` directory of the SpectralEarth dataset.
+    The LMDB keys will be the names of the enmap `patches_directory/patch_name`.
+    """
+    log.info(f"Searching for patches in: {dataset_dir}")
+    # Remember: `SpectralEarth` has multiple bands per file!
+    patch_paths = fast_find(
+        r"\d+.tif$", str(dataset_dir), only_dir=False, exact_depth=2
+    )
+    num_patch_paths = len(patch_paths)
+    log.debug(f"Found {num_patch_paths} patches.")
+    assert num_patch_paths > 0
+    env = open_lmdb(str(target_dir))
+    log.debug("Writing SpectralEarth enmap data into LMDB")
+    lmdb_writer(
+        env,
+        patch_paths,
+        encode_with_parent,
+        spectral_earth_to_safetensor,
+        max_workers=num_workers,
+    )
+
+
+@app.command()
 def hyspecnet_11k(
     target_dir: TargetDir,
     dataset_dir: DatasetDir,
@@ -557,6 +589,21 @@ def hyspecnet_to_safetensor(patch_path: str) -> bytes:
             p.joinpath(f"{p.stem}-SPECTRAL_IMAGE.TIF"), index=band_idx
         )
         for band_idx in range(1, NUM_HYSPECNET_BANDS + 1)
+    }
+    return save(data, metadata=None)
+
+
+def spectral_earth_to_safetensor(patch_path: str) -> bytes:
+    """
+    Given the path to a SpectralEarth enmap patch TIFF file,
+    read the individual bands from the given TIF file and
+    write them as entries into a serialized safetensor dictionary.
+    The keys are the integer encoded band values prefixed with `B`.
+    """
+    p = Path(patch_path)
+    data = {
+        f"B{band_idx}": read_single_band_raster(p, index=band_idx)
+        for band_idx in range(1, NUM_SPECTRAL_EARTH_BANDS + 1)
     }
     return save(data, metadata=None)
 

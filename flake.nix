@@ -88,6 +88,7 @@
               export RICO_HDL_SSL4EO_S12_S2_L1C_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s2c
               export RICO_HDL_SSL4EO_S12_S2_L2A_PATH=${./integration_tests/tiffs/SSL4EO-S12}/s2a
               export RICO_HDL_HYSPECNET_PATH=${./integration_tests/tiffs/HySpecNet-11k}
+              export RICO_HDL_SPECTRAL_EARTH_PATH=${./integration_tests/tiffs/spectral_earth/enmap}
               export RICO_HDL_LMDB_REF_PATH=${./integration_tests/BigEarthNet_LMDB}
               export RICO_HDL_UC_MERCED_PATH=${./integration_tests/tiffs/UCMerced_LandUse}
               export RICO_HDL_HYDRO_PATH=${./integration_tests/tiffs/Hydro}
@@ -154,6 +155,7 @@
                 {
                   enterShell = self.checks.${system}.pre-commit-check.shellHook;
                   env.RICO_HDL_HYSPECNET_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/HySpecNet-11k/";
+                  env.RICO_HDL_SPECTRAL_EARTH_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/spectral_earth/enmap/";
                   env.RICO_HDL_UC_MERCED_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/UCMerced_LandUse/";
                   env.RICO_HDL_HYDRO_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/Hydro/";
                   env.RICO_HDL_EUROSAT_MS_PATH = "${config.env.DEVENV_ROOT}/integration_tests/tiffs/EuroSAT_MS";

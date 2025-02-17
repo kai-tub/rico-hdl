@@ -100,6 +100,17 @@ def hyspecnet_root() -> Path:
 
 
 @pytest.fixture(scope="session")
+def spectral_earth_enmap_root() -> Path:
+    str_p = (
+        os.environ.get("RICO_HDL_SPECTRAL_EARTH_PATH") or "./tiffs/spectral_earth/enmap"
+    )
+    p = Path(str_p)
+    assert p.exists()
+    assert p.is_dir()
+    return p
+
+
+@pytest.fixture(scope="session")
 def uc_merced_root() -> Path:
     str_p = os.environ.get("RICO_HDL_UC_MERCED_PATH") or "./tiffs/UCMerced_LandUse/"
     p = Path(str_p)
@@ -236,6 +247,23 @@ def encoded_hyspecnet_path(hyspecnet_root, tmpdir_factory) -> Path:
             "rico-hdl",
             "hyspecnet-11k",
             f"--dataset-dir={hyspecnet_root}",
+            f"--target-dir={tmp_path}",
+        ],
+        check=True,
+    )
+    return Path(tmp_path)
+
+
+@pytest.fixture
+def encoded_spectral_earth_enmap_path(
+    spectral_earth_enmap_root, tmpdir_factory
+) -> Path:
+    tmp_path = tmpdir_factory.mktemp("spectral_earth_lmdb")
+    subprocess.run(
+        [
+            "rico-hdl",
+            "spectral-earth-enmap",
+            f"--dataset-dir={spectral_earth_enmap_root}",
             f"--target-dir={tmp_path}",
         ],
         check=True,
@@ -645,6 +673,39 @@ def test_hyspecnet_integration(hyspecnet_root, encoded_hyspecnet_path):
     assert "B0" not in safetensors_keys
     assert "B01" not in safetensors_keys
     assert "B225" not in safetensors_keys
+
+    assert all(arr.shape == (128, 128) for arr in sample_safetensors_dict.values())
+    assert all(arr.dtype == "int16" for arr in sample_safetensors_dict.values())
+
+
+def test_spectral_earth_enmap_integration(
+    spectral_earth_enmap_root, encoded_spectral_earth_enmap_path
+):
+    env = lmdb.open(str(encoded_spectral_earth_enmap_path), readonly=True)
+
+    with env.begin(write=False) as txn:
+        cur = txn.cursor()
+        decoded_lmdb_data = {k.decode("utf-8"): load(v) for (k, v) in cur}
+
+    lmdb_keys = decoded_lmdb_data.keys()
+
+    # only have two samples
+    assert len(lmdb_keys) == 3
+
+    assert "0000649_00020.tif" in lmdb_keys
+    assert "0000649_01468.tif" in lmdb_keys
+    assert "0091278_00581.tif" in lmdb_keys
+
+    sample_safetensors_dict = decoded_lmdb_data.get("0000649_00020.tif")
+    assert sample_safetensors_dict is not None
+    safetensors_keys = sample_safetensors_dict.keys()
+    assert "B1" in safetensors_keys
+    assert "B100" in safetensors_keys
+    assert "B202" in safetensors_keys
+
+    assert "B0" not in safetensors_keys
+    assert "B01" not in safetensors_keys
+    assert "B203" not in safetensors_keys
 
     assert all(arr.shape == (128, 128) for arr in sample_safetensors_dict.values())
     assert all(arr.dtype == "int16" for arr in sample_safetensors_dict.values())

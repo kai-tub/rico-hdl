@@ -162,13 +162,13 @@ DatasetDir: TypeAlias = Annotated[
 
 
 def open_lmdb(dir: str):
-    # 1TB for map_size
+    # 100 TB for map_size
     log.debug(f"Opening LMDB database: {dir}")
     return lmdb.open(
         str(dir),
         readonly=False,
         create=True,
-        map_size=(1 * 1024 * 1024 * 1024 * 1024),
+        map_size=(100 * 1024 * 1024 * 1024 * 1024),
     )
 
 

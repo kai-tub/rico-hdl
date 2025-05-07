@@ -959,17 +959,17 @@ These characteristics make array-structured data formats less suitable for deep-
 
 ## Citation
 
+
 If you use this work, please cite:
 
+> K. N. Clasen, L. Hackel, T. Burgert, G. Sumbul, B. Demіr and M. Volker, "reBEN: Refined BigEarthNet Dataset for Remote Sensing Image Analysis", IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 2025.
+
 ```bibtex
-@article{clasen2024refinedbigearthnet,
-  title={reBEN: Refined BigEarthNet Dataset for Remote Sensing Image Analysis},
+@inproceedings{clasen2025refinedbigearthnet,
+  title={{reBEN}: Refined BigEarthNet Dataset for Remote Sensing Image Analysis},
   author={Clasen, Kai Norman and Hackel, Leonard and Burgert, Tom and Sumbul, Gencer and Demir, Beg{\"u}m and Markl, Volker},
-  year={2024},
-  eprint={2407.03653},
-  archivePrefix={arXiv},
-  primaryClass={cs.CV},
-  url={https://arxiv.org/abs/2407.03653},
+  year={2025},
+  booktitle={IEEE International Geoscience and Remote Sensing Symposium (IGARSS)},
 }
 ```
 
